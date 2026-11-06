@@ -121,7 +121,7 @@ struct AddFixtureSheet: View {
               let firstAssign = allocationPreview.assignments.first else { return nil }
         let base = customBaseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? def.model : customBaseName
         let firstName = quantity > 1 ? "\(base) 1" : base
-        let short = PatchMath.suggestShortName(for: def, role: selectedRole, existing: app.show.fixtures)
+        let short = PatchMath.suggestShortName(role: selectedRole, category: def.category, existingFixtures: app.show.fixtures)
         let dummy = PatchedFixture(
             name: firstName,
             shortName: short,

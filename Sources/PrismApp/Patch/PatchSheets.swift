@@ -1029,7 +1029,21 @@ struct ProfileEditorSheet: View {
     }
 
     private var validationWarnings: [String] {
-        draftDefinition.validate()
+        var issues: [String] = []
+        if model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            issues.append("Model name cannot be empty.")
+        }
+        if channels.isEmpty {
+            issues.append("Add at least 1 DMX channel.")
+        } else if channels.count > 512 {
+            issues.append("A single DMX mode cannot exceed 512 channels.")
+        }
+        for (i, ch) in channels.enumerated() where ch.fine {
+            if i == 0 || channels[i - 1].kind != ch.kind {
+                issues.append("Ch \(i + 1) (\(ch.displayName)) is marked 16-bit fine without a matching coarse channel right before it.")
+            }
+        }
+        return issues
     }
 
     var body: some View {

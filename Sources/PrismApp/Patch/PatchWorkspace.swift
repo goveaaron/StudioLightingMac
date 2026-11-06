@@ -412,12 +412,12 @@ struct PatchWorkspace: View {
             return Theme.danger
         }
         switch block.role {
-        case .key, .front: return Color(hex: 0x38BDF8)
+        case .key: return Color(hex: 0x38BDF8)
         case .fill: return Color(hex: 0x60A5FA)
-        case .back, .rim, .hair: return Color(hex: 0x8B5CF6)
-        case .background, .wall: return Color(hex: 0x7C8CFF)
+        case .back, .hair, .kicker: return Color(hex: 0x8B5CF6)
+        case .background: return Color(hex: 0x7C8CFF)
         case .practical, .accent: return Color(hex: 0xF59E0B)
-        case .floor, .overhead, .side, .cyclorama, .other: return Color(hex: 0x34D399)
+        case .ambient, .effect, .other: return Color(hex: 0x34D399)
         }
     }
 

@@ -41,7 +41,7 @@ extension ShowController {
             let assign = i < allocation.assignments.count
                 ? allocation.assignments[i]
                 : PatchMath.AddressAssignment(universe: universe, address: 1)
-            let short = PatchMath.suggestShortName(for: def, role: role, existing: currentFixtures)
+            let short = PatchMath.suggestShortName(role: role, category: def.category, existingFixtures: currentFixtures)
             let existingInRole = currentFixtures.filter { $0.role == role }.count
             let transform = PatchMath.suggestTransform(
                 role: role,
@@ -108,7 +108,7 @@ extension ShowController {
                 existing: simResolved
             )
             let assign = alloc.assignments.first ?? PatchMath.AddressAssignment(universe: src.universe, address: 1)
-            let short = PatchMath.suggestShortName(for: def, role: src.role, existing: currentFixtures)
+            let short = PatchMath.suggestShortName(role: src.role, category: def.category, existingFixtures: currentFixtures)
             var t = src.transform
             t.x = clamp(t.x + 0.35, 0.3, max(0.3, stage.width - 0.3))
             t.y = clamp(t.y + 0.25, 0.3, max(0.3, stage.height - 0.3))
@@ -193,8 +193,7 @@ extension ShowController {
     /// Imports a decoded Lightkey project into the active show.
     func importLightkeyResult(_ result: LightkeyImportResult, fileURL: URL? = nil) {
         library.registerEmbedded(result.project.definitions)
-        load(result.project, fileURL: nil, restoreLive: true)
-        isDirty = true
+        load(result.project, fileURL: fileURL, restoreLive: true)
     }
 
     /// Sets raw DMX channel overrides for the Channel Tester or Address Scan sheet.
