@@ -432,8 +432,6 @@ public extension FixtureSelector {
 }
 
 public extension LightColor {
-    /// Convenience constructor for neutral-tint Kelvin white.
-    static func kelvin(_ kelvin: Double) -> LightColor { .kelvin(kelvin, tint: 0) }
     /// Correlated color temperature in Kelvin.
     var kelvinEquivalent: Double { approximateKelvin.kelvin }
 }
