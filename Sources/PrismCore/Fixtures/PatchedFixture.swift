@@ -68,6 +68,63 @@ public struct StageTransform: Codable, Hashable, Sendable {
     }
 }
 
+/// Dimmer response curve mapping normalized intensity (0…1) to output drive fraction (0…1).
+public enum DimmerCurve: String, Codable, CaseIterable, Hashable, Sendable {
+    /// Direct 1:1 linear mapping (`y = x`).
+    case linear
+    /// Classic theatrical / IES square-law curve (`y = x²`) for smooth low-end dimming.
+    case squareLaw
+    /// Theatrical S-curve (`y = 3x² - 2x³`) with gentle toe and soft top shoulder.
+    case sCurve
+    /// Perceptual LED smoothing curve (CIE L* inverse + soft low-end toe so LEDs don't step at 1–5%).
+    case ledSmooth
+
+    public var displayName: String {
+        switch self {
+        case .linear: return "Linear"
+        case .squareLaw: return "Square Law"
+        case .sCurve: return "S-Curve"
+        case .ledSmooth: return "LED Smooth"
+        }
+    }
+
+    /// Evaluates the dimmer curve for a normalized input `x` in `0…1`.
+    @inline(__always)
+    public func apply(_ x: Double) -> Double {
+        let v = clamp01(x.finiteOr(0))
+        guard v > 0 else { return 0 }
+        guard v < 1 else { return 1 }
+        switch self {
+        case .linear:
+            return v
+        case .squareLaw:
+            return v * v
+        case .sCurve:
+            return v * v * (3.0 - 2.0 * v)
+        case .ledSmooth:
+            // Blend CIE L* perceptual response with a gentle linear toe so 1% stays above zero.
+            let lStar = ColorMath.perceptualToLinearIntensity(v)
+            return clamp01(0.85 * lStar + 0.15 * (v * v))
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = (try? decoder.singleValueContainer().decode(String.self)) ?? "linear"
+        switch raw.lowercased() {
+        case "linear", "lin":
+            self = .linear
+        case "squarelaw", "square_law", "square", "quadratic", "ies":
+            self = .squareLaw
+        case "scurve", "s_curve", "s-curve", "smooth", "sinusoidal":
+            self = .sCurve
+        case "ledsmooth", "led_smooth", "led", "perceptual", "cubic":
+            self = .ledSmooth
+        default:
+            self = .linear
+        }
+    }
+}
+
 /// Per-fixture safety/creative limits.
 public struct FixtureLimits: Codable, Hashable, Sendable {
     /// Output intensity is scaled into [minIntensity, maxIntensity] (0…1).
@@ -77,10 +134,54 @@ public struct FixtureLimits: Codable, Hashable, Sendable {
     public var allowEffects: Bool
     /// If false, strobing is suppressed entirely.
     public var allowStrobe: Bool
+    /// Dimmer transfer curve applied to master intensity.
+    public var dimmerCurve: DimmerCurve
+    /// When true (recommended for key lights), the fixture never dims all the way to 0 DMX while
+    /// `state.intensity > 0` (maintaining at least `max(minIntensity, 1/255)` until turned off).
+    public var neverFullyOffUnlessZero: Bool
 
-    public init(maxIntensity: Double = 1, minIntensity: Double = 0, allowEffects: Bool = true, allowStrobe: Bool = true) {
-        self.maxIntensity = maxIntensity; self.minIntensity = minIntensity
-        self.allowEffects = allowEffects; self.allowStrobe = allowStrobe
+    public init(
+        maxIntensity: Double = 1,
+        minIntensity: Double = 0,
+        allowEffects: Bool = true,
+        allowStrobe: Bool = true,
+        dimmerCurve: DimmerCurve = .linear,
+        neverFullyOffUnlessZero: Bool = false
+    ) {
+        self.maxIntensity = maxIntensity
+        self.minIntensity = minIntensity
+        self.allowEffects = allowEffects
+        self.allowStrobe = allowStrobe
+        self.dimmerCurve = dimmerCurve
+        self.neverFullyOffUnlessZero = neverFullyOffUnlessZero
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case maxIntensity, minIntensity, allowEffects, allowStrobe, dimmerCurve, neverFullyOffUnlessZero
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        maxIntensity = clamp01((try c.decodeIfPresent(Double.self, forKey: .maxIntensity) ?? 1).finiteOr(1))
+        minIntensity = clamp01((try c.decodeIfPresent(Double.self, forKey: .minIntensity) ?? 0).finiteOr(0))
+        allowEffects = try c.decodeIfPresent(Bool.self, forKey: .allowEffects) ?? true
+        allowStrobe = try c.decodeIfPresent(Bool.self, forKey: .allowStrobe) ?? true
+        dimmerCurve = try c.decodeIfPresent(DimmerCurve.self, forKey: .dimmerCurve) ?? .linear
+        neverFullyOffUnlessZero = try c.decodeIfPresent(Bool.self, forKey: .neverFullyOffUnlessZero) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(maxIntensity, forKey: .maxIntensity)
+        try c.encode(minIntensity, forKey: .minIntensity)
+        try c.encode(allowEffects, forKey: .allowEffects)
+        try c.encode(allowStrobe, forKey: .allowStrobe)
+        if dimmerCurve != .linear {
+            try c.encode(dimmerCurve, forKey: .dimmerCurve)
+        }
+        if neverFullyOffUnlessZero {
+            try c.encode(neverFullyOffUnlessZero, forKey: .neverFullyOffUnlessZero)
+        }
     }
 
     public static let `default` = FixtureLimits()
@@ -96,9 +197,55 @@ public struct ColorCalibration: Codable, Hashable, Sendable {
     /// How hex colors are converted: true = photometrically accurate (decode sRGB gamma);
     /// false = send hex bytes directly like most consoles.
     public var accurateColor: Bool
+    /// White-point Kelvin trim (e.g. `+150` or `-200` K) applied to match fixtures across brands.
+    public var whitePointKelvinTrim: Double
+    /// White-point green/magenta tint trim (`-1…+1`, negative = greener, positive = more magenta).
+    public var whitePointTintTrim: Double
+    /// Optional per-fixture dimmer curve override.
+    public var dimmerCurve: DimmerCurve?
 
-    public init(gamma: Double = 1, gains: [String: Double] = [:], accurateColor: Bool = true) {
-        self.gamma = gamma; self.gains = gains; self.accurateColor = accurateColor
+    public init(
+        gamma: Double = 1,
+        gains: [String: Double] = [:],
+        accurateColor: Bool = true,
+        whitePointKelvinTrim: Double = 0,
+        whitePointTintTrim: Double = 0,
+        dimmerCurve: DimmerCurve? = nil
+    ) {
+        self.gamma = gamma
+        self.gains = gains
+        self.accurateColor = accurateColor
+        self.whitePointKelvinTrim = whitePointKelvinTrim
+        self.whitePointTintTrim = whitePointTintTrim
+        self.dimmerCurve = dimmerCurve
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case gamma, gains, accurateColor, whitePointKelvinTrim, whitePointTintTrim, dimmerCurve
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        gamma = (try c.decodeIfPresent(Double.self, forKey: .gamma) ?? 1).finiteOr(1)
+        gains = try c.decodeIfPresent([String: Double].self, forKey: .gains) ?? [:]
+        accurateColor = try c.decodeIfPresent(Bool.self, forKey: .accurateColor) ?? true
+        whitePointKelvinTrim = (try c.decodeIfPresent(Double.self, forKey: .whitePointKelvinTrim) ?? 0).finiteOr(0)
+        whitePointTintTrim = clamp((try c.decodeIfPresent(Double.self, forKey: .whitePointTintTrim) ?? 0).finiteOr(0), -1, 1)
+        dimmerCurve = try c.decodeIfPresent(DimmerCurve.self, forKey: .dimmerCurve)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(gamma, forKey: .gamma)
+        try c.encode(gains, forKey: .gains)
+        try c.encode(accurateColor, forKey: .accurateColor)
+        if abs(whitePointKelvinTrim) > 1e-6 {
+            try c.encode(whitePointKelvinTrim, forKey: .whitePointKelvinTrim)
+        }
+        if abs(whitePointTintTrim) > 1e-6 {
+            try c.encode(whitePointTintTrim, forKey: .whitePointTintTrim)
+        }
+        try c.encodeIfPresent(dimmerCurve, forKey: .dimmerCurve)
     }
 
     public static let `default` = ColorCalibration()

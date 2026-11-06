@@ -3,6 +3,11 @@ import XCTest
 
 final class ColorTests: XCTestCase {
 
+    override func setUp() {
+        super.setUp()
+        FixtureRenderer.resetHysteresisState()
+    }
+
     // MARK: - 1. Hex, CSS rgb(), and Color Space Round-Trips
 
     func testHexAndCSSRoundTrip() throws {
@@ -94,7 +99,6 @@ final class ColorTests: XCTestCase {
                 let txy = ColorMath.kelvinToXY(k, tint: tint)
                 let rDuv = ColorMath.xyToKelvinAndDuv(x: txy.x, y: txy.y)
                 let rTint = ColorMath.xyToKelvinAndTint(x: txy.x, y: txy.y)
-                // Across 1700–20000K, verify Duv accuracy < 0.002 and Kelvin accuracy < 20K (for standard range)
                 XCTAssertEqual(rDuv.duv, expectedDuv, accuracy: 0.002, "Duv round-trip failed for \(k)K tint \(tint)")
                 XCTAssertEqual(rTint.tint, tint, accuracy: 0.04, "Tint round-trip failed for \(k)K tint \(tint)")
                 if k <= 12000 || abs(tint) <= 0.4 {
@@ -105,7 +109,6 @@ final class ColorTests: XCTestCase {
     }
 
     func testSidusAndAputureTintConventions() {
-        // Negative Prism tint = Green (+Duv, +Sidus G/M, DMX 245...255)
         XCTAssertEqual(ColorMath.tintToSidusGM(-1.0), 1.0, accuracy: 1e-6)
         XCTAssertEqual(ColorMath.tintToSidusGM(1.0), -1.0, accuracy: 1e-6)
         XCTAssertEqual(ColorMath.sidusGMToTint(1.0), -1.0, accuracy: 1e-6)
@@ -120,7 +123,6 @@ final class ColorTests: XCTestCase {
     // MARK: - 3. Gamut Mapping & Delta-E
 
     func testGamutMappingPreservesHueAndLightness() {
-        // Out-of-gamut high-chroma OKLCh color
         let L = 0.72
         let C = 0.42
         let h = 145.0
@@ -138,13 +140,11 @@ final class ColorTests: XCTestCase {
         XCTAssertEqual(ColorMath.deltaE2000(teal, teal), 0.0, accuracy: 1e-9)
         XCTAssertEqual(ColorMath.deltaEOKLab(teal, teal), 0.0, accuracy: 1e-9)
 
-        // Slightly perturbed color should have small ΔE2000 (< 2)
         let nearTeal = RGB(r: teal.r, g: teal.g - 0.01, b: teal.b + 0.01)
         let de = ColorMath.deltaE2000(teal, nearTeal)
         XCTAssertGreaterThan(de, 0.1)
         XCTAssertLessThan(de, 2.0)
 
-        // Opposite colors should have large ΔE2000
         let red = RGB(hex: "#FF0000")!
         XCTAssertGreaterThan(ColorMath.deltaE2000(teal, red), 40.0)
     }
@@ -159,7 +159,6 @@ final class ColorTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(GelLibrary.ctb.count, 10)
         XCTAssertGreaterThanOrEqual(GelLibrary.plusMinusGreen.count, 12)
 
-        // Classic theatrical & correction gels must resolve by code, number, and name
         let r02 = try XCTUnwrap(GelLibrary.gel("R02"))
         XCTAssertTrue(r02.name.localizedCaseInsensitiveContains("Bastard Amber"))
         XCTAssertEqual(GelLibrary.gel("Bastard Amber")?.id, r02.id)
@@ -168,7 +167,6 @@ final class ColorTests: XCTestCase {
         XCTAssertEqual(l201.category, .ctb)
         let l204 = try XCTUnwrap(GelLibrary.gel("L204"))
         XCTAssertEqual(l204.category, .cto)
-        // L204 Full CTO on 5600K daylight shifts to ~3200K tungsten
         if case .kelvin(let shiftedK, _) = l204.color(baseKelvin: 5600) {
             XCTAssertEqual(shiftedK, 3200, accuracy: 150)
         } else {
@@ -190,22 +188,11 @@ final class ColorTests: XCTestCase {
         } else {
             XCTFail("Expected Plus Green gel to return .kelvin with tint")
         }
-
-        // Optional JSON export when EXPORT_GELS_JSON=1
-        if ProcessInfo.processInfo.environment["EXPORT_GELS_JSON"] == "1" {
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            let data = try encoder.encode(GelLibrary.all)
-            let url = URL(fileURLWithPath: "/home/antigravity/wt/color/Resources/Gels/gels.json")
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: url)
-        }
     }
 
     // MARK: - 5. NamedColors & Real-Source Presets
 
     func testNamedColorsAndRealSources() throws {
-        // Studio & film words
         let queries = [
             "teal", "magenta", "warm white", "tungsten", "daylight",
             "moonlight", "golden hour", "sodium vapor", "mercury vapor",
@@ -215,20 +202,389 @@ final class ColorTests: XCTestCase {
             XCTAssertNotNil(NamedColors.resolve(q), "Failed to resolve named color '\(q)'")
         }
 
-        // Studio teal matches DemoRig swatch #00C2A8
         XCTAssertEqual(NamedColors.resolve("teal")?.hex, "#00C2A8")
 
-        // Tungsten resolves to 3200K
         if case .kelvin(let k, _) = try XCTUnwrap(NamedColors.resolve("tungsten")) {
             XCTAssertEqual(k, 3200, accuracy: 1)
         } else {
             XCTFail("Expected tungsten to resolve to .kelvin(3200)")
         }
 
-        // Cool-white fluorescent has green shift (negative Prism tint / positive Duv)
         let fl = try XCTUnwrap(NamedColors.sourcePreset(named: "cool-white fluorescent"))
         XCTAssertLessThan(fl.tint, -0.2)
         XCTAssertGreaterThan(fl.duv, 0.005)
+    }
+
+    // MARK: - 6. EmitterMixer: ΔE2000 < 2 Across RGBW, RGBWW, RGBA, RGBACL, RGB+Lime
+
+    func testEmitterMixerDeltaE2000AndBroadbandPreference() throws {
+        let emitterSets: [(name: String, emitters: Set<ChannelKind>)] = [
+            ("RGB", [.red, .green, .blue]),
+            ("RGBW", [.red, .green, .blue, .white]),
+            ("RGBA", [.red, .green, .blue, .amber]),
+            ("RGBWW", [.red, .green, .blue, .warmWhite, .coolWhite]),
+            ("RGBACL", [.red, .green, .blue, .amber, .cyan, .lime]),
+            ("RGB+Lime", [.red, .green, .blue, .lime])
+        ]
+
+        let targetColors: [LightColor] = [
+            .kelvin(2700, tint: 0),
+            .kelvin(3200, tint: 0),
+            .kelvin(4300, tint: -0.15),
+            .kelvin(5600, tint: 0),
+            .kelvin(6500, tint: 0.1),
+            .rgb(RGB(hex: "#00C2A8")!), // Teal
+            .rgb(RGB(hex: "#FF2FB4")!), // Pink
+            .rgb(RGB(hex: "#FF7A1A")!), // Amber Orange
+            .rgb(RGB(hex: "#FF8C7A")!), // Salmon pastel
+            .rgb(RGB(hex: "#D6B8FF")!), // Lavender pastel
+            .rgb(RGB(hex: "#A6DCFF")!), // Steel blue pastel
+            .rgb(RGB(hex: "#B8FF1F")!), // Lime green
+            .rgb(RGB(hex: "#FF0000")!), // Pure Red
+            .rgb(RGB(hex: "#00FF00")!), // Pure Green
+            .rgb(RGB(hex: "#0000FF")!)  // Pure Blue
+        ]
+
+        for (familyName, emitters) in emitterSets {
+            for target in targetColors {
+                let levels = EmitterMixer.mix(target, emitters: emitters, calibration: .default)
+                let de = EmitterMixer.deltaE2000(target: target, levels: levels)
+                XCTAssertLessThan(
+                    de,
+                    2.0,
+                    "ΔE2000 (\(de)) >= 2.0 on \(familyName) for target \(target.label)"
+                )
+            }
+        }
+
+        // Verify broadband preference:
+        // 1. RGBW on 5600K white strongly prefers the .white emitter
+        let rgbw5600 = EmitterMixer.mix(.kelvin(5600), emitters: [.red, .green, .blue, .white])
+        XCTAssertGreaterThan(rgbw5600[.white] ?? 0, 0.90, "RGBW should strongly prefer W on 5600K")
+
+        // 2. RGBWW on 2700K warm white prefers .warmWhite; on 6500K cool white prefers .coolWhite
+        let rgbww2700 = EmitterMixer.mix(.kelvin(2700), emitters: [.red, .green, .blue, .warmWhite, .coolWhite])
+        XCTAssertGreaterThan(rgbww2700[.warmWhite] ?? 0, 0.85, "RGBWW should prefer WW at 2700K")
+        let rgbww6500 = EmitterMixer.mix(.kelvin(6500), emitters: [.red, .green, .blue, .warmWhite, .coolWhite])
+        XCTAssertGreaterThan(rgbww6500[.coolWhite] ?? 0, 0.85, "RGBWW should prefer CW at 6500K")
+
+        // 3. RGBA on warm amber/salmon engages .amber
+        let rgbaAmber = EmitterMixer.mix(.rgb(RGB(hex: "#FF7A1A")!), emitters: [.red, .green, .blue, .amber])
+        XCTAssertGreaterThan(rgbaAmber[.amber] ?? 0, 0.40, "RGBA should engage amber on warm orange")
+
+        // 4. RGB+Lime on yellow-green / white engages .lime
+        let rgblWhite = EmitterMixer.mix(.kelvin(5600), emitters: [.red, .green, .blue, .lime])
+        XCTAssertGreaterThan(rgblWhite[.lime] ?? 0, 0.40, "RGB+Lime should engage lime on white")
+    }
+
+    func testEmitterMixerDirectModeAndNativeWhiteHysteresis() {
+        // Direct mode: #FF00AA goes straight to R/G/B channels without white extraction
+        let directCal = ColorCalibration(accurateColor: false)
+        let hexColor = LightColor.rgb(RGB(hex: "#FF00AA")!)
+        let levels = EmitterMixer.mix(
+            hexColor,
+            emitters: [.red, .green, .blue, .white],
+            calibration: directCal
+        )
+        XCTAssertEqual(levels[.red] ?? 0, 1.0, accuracy: 1e-6)
+        XCTAssertEqual(levels[.green] ?? 0, 0.0, accuracy: 1e-6)
+        XCTAssertEqual(levels[.blue] ?? 0, 170.0 / 255.0, accuracy: 1e-6)
+        XCTAssertEqual(levels[.white] ?? 0, 0.0, accuracy: 1e-6)
+
+        // Native white hysteresis:
+        // A slightly tinted RGB color with |Duv| = 0.010 (inside [0.006, 0.016] hysteresis deadband)
+        // stays false when previouslyNativeWhite == false, and stays true when previouslyNativeWhite == true!
+        let mode = FixtureMode(
+            name: "CCT&RGB",
+            channels: [
+                ChannelDefinition(kind: .intensity),
+                ChannelDefinition(kind: .cct, physical: PhysicalRange(from: 2700, to: 10000)),
+                ChannelDefinition(kind: .tint, defaultValue: 128),
+                ChannelDefinition(kind: .crossfade),
+                ChannelDefinition(kind: .red),
+                ChannelDefinition(kind: .green),
+                ChannelDefinition(kind: .blue)
+            ]
+        )
+        let caps = mode.capabilities
+        let borderXY = ColorMath.kelvinToXY(4500, tint: 0.5) // |Duv| = 0.5 * 0.02 = 0.010
+        let borderColor = LightColor.xy(x: borderXY.x, y: borderXY.y)
+
+        XCTAssertFalse(
+            EmitterMixer.shouldUseNativeWhite(
+                for: borderColor,
+                capabilities: caps,
+                cctRange: 2700...10000,
+                previouslyNativeWhite: false
+            ),
+            "Should not enter native white when |Duv| = 0.010 > 0.006"
+        )
+        XCTAssertTrue(
+            EmitterMixer.shouldUseNativeWhite(
+                for: borderColor,
+                capabilities: caps,
+                cctRange: 2700...10000,
+                previouslyNativeWhite: true
+            ),
+            "Should remain in native white when |Duv| = 0.010 <= 0.016 (hysteresis)"
+        )
+    }
+
+    // MARK: - 7. Perceptual Fades (Red -> Cyan OKLab Midpoint, Mired White, Perceptual Intensity)
+
+    func testPerceptualFadesRedToCyanAndMiredAndIntensity() {
+        // 1. Red -> Cyan fade midpoint has OKLCh chroma C > 0.1 (no grey dip)
+        let redState = FixtureState(intensity: 0.0, color: .rgb(RGB(hex: "#FF0000")!))
+        let cyanState = FixtureState(intensity: 1.0, color: .rgb(RGB(hex: "#00FFFF")!))
+        let midState = FixtureState.mix(redState, cyanState, 0.5)
+
+        let midLCh = midState.color.okLCh
+        XCTAssertGreaterThan(midLCh.C, 0.1, "Red -> Cyan midpoint must stay saturated (C = \(midLCh.C) > 0.1), not grey")
+
+        // 2. Perceptual intensity fade: 0 -> 1 at t = 0.5 has 50% CIE L* perceptual brightness (~0.184 linear)
+        XCTAssertLessThan(midState.intensity, 0.35, "Perceptual intensity midpoint should be < 0.35 linear (50% perceived brightness)")
+        XCTAssertGreaterThan(midState.intensity, 0.10)
+        XCTAssertEqual(ColorMath.linearToPerceptualIntensity(midState.intensity), 0.5, accuracy: 1e-4)
+
+        // 3. White-to-white fades interpolate in mireds (1e6 / K), not linear Kelvin
+        let wWarm = LightColor.kelvin(2500, tint: -0.2) // 400 mired
+        let wCool = LightColor.kelvin(10000, tint: 0.4) // 100 mired
+        let wMid = LightColor.mix(wWarm, wCool, 0.5)    // 250 mired = 4000 K (not 6250 K!)
+        if case .kelvin(let k, let tint) = wMid {
+            XCTAssertEqual(k, 4000.0, accuracy: 1.0, "Mired midpoint of 2500K and 10000K must be 4000K")
+            XCTAssertEqual(tint, 0.1, accuracy: 1e-6)
+        } else {
+            XCTFail("Expected .kelvin from white-to-white fade")
+        }
+
+        // 4. Pixel arrays interpolate cell-by-cell
+        let pA = FixtureState(
+            intensity: 1.0,
+            color: .white,
+            cells: [
+                CellState(intensity: 0.0, color: .rgb(RGB(hex: "#FF0000")!)),
+                CellState(intensity: 1.0, color: .kelvin(2500))
+            ]
+        )
+        let pB = FixtureState(
+            intensity: 1.0,
+            color: .white,
+            cells: [
+                CellState(intensity: 1.0, color: .rgb(RGB(hex: "#00FFFF")!)),
+                CellState(intensity: 1.0, color: .kelvin(10000))
+            ]
+        )
+        let pMid = FixtureState.mix(pA, pB, 0.5)
+        XCTAssertEqual(pMid.cells?.count, 2)
+        XCTAssertGreaterThan(pMid.cells?[0].color.okLCh.C ?? 0, 0.1)
+        if case .kelvin(let cellK, _) = pMid.cells?[1].color {
+            XCTAssertEqual(cellK, 4000.0, accuracy: 1.0)
+        } else {
+            XCTFail("Expected cell 1 to interpolate in mireds")
+        }
+    }
+
+    // MARK: - 8. PT4c Pixel Mode Golden DMX Values & FixtureRenderer Features
+
+    private func makePT4cPixelFixture(pixels: Int = 8) -> ResolvedFixture {
+        var channels: [ChannelDefinition] = []
+        for cell in 0..<pixels {
+            channels.append(ChannelDefinition(kind: .intensity, cell: cell))
+            channels.append(ChannelDefinition(kind: .cct, cell: cell, physical: PhysicalRange(from: 2700, to: 10000)))
+            channels.append(ChannelDefinition(kind: .tint, cell: cell, defaultValue: 128, physical: PhysicalRange(from: -1, to: 1)))
+            channels.append(ChannelDefinition(kind: .crossfade, cell: cell, physical: PhysicalRange(from: 0, to: 1)))
+            channels.append(ChannelDefinition(kind: .red, cell: cell))
+            channels.append(ChannelDefinition(kind: .green, cell: cell))
+            channels.append(ChannelDefinition(kind: .blue, cell: cell))
+        }
+        let mode = FixtureMode(
+            name: "Light Engine CCT & RGB \(pixels) Pixels",
+            shortName: "LE \(pixels)px",
+            recommended: true,
+            channels: channels
+        )
+        let def = FixtureDefinition(
+            id: "amaran.pt4c",
+            manufacturer: "amaran",
+            model: "PT4c",
+            category: .tube,
+            cctRange: [2700, 10000],
+            modes: [mode]
+        )
+        let patched = PatchedFixture(
+            name: "PT4c",
+            shortName: "PT1",
+            definitionID: def.id,
+            modeName: mode.name,
+            universe: 1,
+            address: 1
+        )
+        return ResolvedFixture(fixture: patched, definition: def, mode: mode)
+    }
+
+    func testPT4cPixelModeGoldenDMX() {
+        let pt4c = makePT4cPixelFixture(pixels: 8)
+        XCTAssertEqual(pt4c.channelCount, 56)
+
+        // 1. 3200K warm white @ 50% -> [128, 17, 128, 0, 0, 0, 0] per pixel
+        let state3200 = FixtureState(intensity: 0.5, color: .kelvin(3200, tint: 0))
+        let dmx3200 = FixtureRenderer.render(state3200, fixture: pt4c)
+        XCTAssertEqual(Array(dmx3200[0..<7]), [128, 17, 128, 0, 0, 0, 0])
+        XCTAssertEqual(Array(dmx3200[49..<56]), [128, 17, 128, 0, 0, 0, 0])
+
+        // 2. Pure Red (#FF0000) @ 100% -> [255, 0, 128, 255, 255, 0, 0] per pixel
+        let stateRed = FixtureState(intensity: 1.0, color: .rgb(RGB(hex: "#FF0000")!))
+        let dmxRed = FixtureRenderer.render(stateRed, fixture: pt4c)
+        XCTAssertEqual(Array(dmxRed[0..<7]), [255, 0, 128, 255, 255, 0, 0])
+        XCTAssertEqual(Array(dmxRed[49..<56]), [255, 0, 128, 255, 255, 0, 0])
+
+        // 3. Studio Teal (#00C2A8) @ 100% -> [255, 0, 128, 255, 0, 255, 185] per pixel
+        let stateTeal = FixtureState(intensity: 1.0, color: .rgb(RGB(hex: "#00C2A8")!))
+        let dmxTeal = FixtureRenderer.render(stateTeal, fixture: pt4c)
+        XCTAssertEqual(Array(dmxTeal[0..<7]), [255, 0, 128, 255, 0, 255, 185])
+    }
+
+    func testFixtureRendererDimmerCurves16BitStrobeSafetyAndKeyKeepAlive() {
+        let mode = FixtureMode(
+            name: "16-bit + Strobe + Effect",
+            channels: [
+                ChannelDefinition(kind: .intensity),
+                ChannelDefinition(kind: .intensity, fine: true),
+                ChannelDefinition(kind: .red),
+                ChannelDefinition(kind: .green),
+                ChannelDefinition(kind: .blue),
+                ChannelDefinition(
+                    kind: .strobe,
+                    capabilities: [
+                        ChannelCapability(from: 0, to: 9, label: "Off", tag: "off"),
+                        ChannelCapability(from: 10, to: 255, label: "Strobe 1-25 Hz", tag: "strobe", physical: [1, 25])
+                    ]
+                ),
+                ChannelDefinition(kind: .effect, defaultValue: 99)
+            ]
+        )
+        let def = FixtureDefinition(
+            id: "test.spot",
+            manufacturer: "Test",
+            model: "Spot",
+            category: .spot,
+            modes: [mode]
+        )
+        var patched = PatchedFixture(
+            name: "Key",
+            definitionID: def.id,
+            modeName: mode.name,
+            universe: 1,
+            address: 1,
+            role: .key,
+            limits: FixtureLimits(
+                maxIntensity: 1.0,
+                minIntensity: 0.0,
+                allowEffects: false,
+                allowStrobe: true,
+                dimmerCurve: .squareLaw,
+                neverFullyOffUnlessZero: true
+            )
+        )
+        let rf = ResolvedFixture(fixture: patched, definition: def, mode: mode)
+
+        // 1. At 50% intensity with squareLaw curve: 0.5^2 = 0.25 -> 16-bit 16384 (coarse 64, fine 0)
+        // Strobe requested at 20 Hz, but photosensitiveSafe = true caps it to 3 Hz!
+        // Effect channel is zeroed regardless of defaultValue: 99.
+        let state50 = FixtureState(intensity: 0.5, color: .rgb(.white), strobeHz: 20.0)
+        let dmx50 = FixtureRenderer.render(
+            state50,
+            fixture: rf,
+            safety: SafetySettings(maxStrobeHz: 18, photosensitiveSafe: true)
+        )
+        XCTAssertEqual(dmx50[0], 64, "Square-law 50% coarse MSB should be 64")
+        XCTAssertEqual(dmx50[1], 0, "Square-law 50% fine LSB should be 0")
+
+        // Strobe at 3 Hz in [1, 25] Hz -> fraction (3-1)/24 = 2/24 -> 10 + 2/24 * 245 = 30
+        XCTAssertEqual(dmx50[5], 30, "Photosensitive mode must cap strobe to <= 3 Hz")
+        XCTAssertEqual(dmx50[6], 0, "Effect channel must be zeroed by default")
+
+        // 2. Key light keep-alive (`neverFullyOffUnlessZero = true`):
+        // Even at 0.5% intensity (where square-law 0.005^2 = 0.000025 would round to 0 on 8-bit),
+        // coarse channel stays >= 1 while intensity > 0, and becomes 0 when intensity == 0.
+        let stateTiny = FixtureState(intensity: 0.005, color: .rgb(.white))
+        let dmxTiny = FixtureRenderer.render(stateTiny, fixture: rf)
+        XCTAssertGreaterThanOrEqual(dmxTiny[0], 1, "Key light with neverFullyOffUnlessZero must not drop to 0 coarse DMX at 0.5%")
+
+        let stateOff = FixtureState(intensity: 0.0, color: .rgb(.white))
+        let dmxOff = FixtureRenderer.render(stateOff, fixture: rf)
+        XCTAssertEqual(dmxOff[0], 0)
+        XCTAssertEqual(dmxOff[1], 0)
+
+        // 3. When allowStrobe = false, strobe channel is forced to Off (0)
+        patched.limits.allowStrobe = false
+        let rfNoStrobe = ResolvedFixture(fixture: patched, definition: def, mode: mode)
+        let dmxNoStrobe = FixtureRenderer.render(state50, fixture: rfNoStrobe)
+        XCTAssertEqual(dmxNoStrobe[5], 0)
+    }
+
+    // MARK: - 9. Performance: Render 16 Universes in < 1 ms
+
+    func testRender16UniversesPerformance() {
+        // Build 16 universes filled with fixtures (16 universes x 10 fixtures = 160 fixtures)
+        let mode = FixtureMode(
+            name: "RGBW 8ch",
+            channels: [
+                ChannelDefinition(kind: .intensity),
+                ChannelDefinition(kind: .red),
+                ChannelDefinition(kind: .green),
+                ChannelDefinition(kind: .blue),
+                ChannelDefinition(kind: .white),
+                ChannelDefinition(kind: .strobe)
+            ]
+        )
+        let def = FixtureDefinition(
+            id: "generic.rgbw",
+            manufacturer: "Generic",
+            model: "RGBW",
+            category: .par,
+            modes: [mode]
+        )
+
+        var fixtures: [ResolvedFixture] = []
+        var states: [FixtureState] = []
+        let colors: [LightColor] = [
+            .rgb(RGB(hex: "#00C2A8")!),
+            .rgb(RGB(hex: "#FF2FB4")!),
+            .kelvin(3200, tint: 0),
+            .kelvin(5600, tint: -0.1),
+            .rgb(RGB(hex: "#FF7A1A")!)
+        ]
+
+        for u in 1...16 {
+            for fIdx in 0..<10 {
+                let p = PatchedFixture(
+                    name: "U\(u)-\(fIdx)",
+                    definitionID: def.id,
+                    modeName: mode.name,
+                    universe: u,
+                    address: 1 + fIdx * 10
+                )
+                fixtures.append(ResolvedFixture(fixture: p, definition: def, mode: mode))
+                states.append(FixtureState(intensity: 0.85, color: colors[(u + fIdx) % colors.count]))
+            }
+        }
+
+        let safety = SafetySettings()
+        // Warmup
+        for i in 0..<fixtures.count {
+            _ = FixtureRenderer.render(states[i], fixture: fixtures[i], safety: safety)
+        }
+
+        let iterations = 10
+        let start = PrismClock.now()
+        for _ in 0..<iterations {
+            for i in 0..<fixtures.count {
+                _ = FixtureRenderer.render(states[i], fixture: fixtures[i], safety: safety)
+            }
+        }
+        let elapsedMs = (PrismClock.now() - start) * 1000.0 / Double(iterations)
+        XCTAssertLessThan(elapsedMs, 1.0, "16-universe render took \(elapsedMs) ms (expected < 1 ms)")
     }
 
     func testLightColorJSONRoundTrip() throws {
