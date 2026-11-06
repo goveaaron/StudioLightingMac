@@ -23,15 +23,40 @@ public struct RGB: Codable, Hashable, Sendable {
     public static let green = RGB(r: 0, g: 1, b: 0)
     public static let blue = RGB(r: 0, g: 0, b: 1)
 
-    // MARK: Hex
+    // MARK: Hex & CSS parsing
 
-    /// Parses `#RGB`, `#RRGGBB`, `RRGGBB`, `0xRRGGBB` (case-insensitive, whitespace tolerant).
+    /// Parses `#RGB`, `#RRGGBB`, `RRGGBB`, `0xRRGGBB`, or `rgb(r,g,b)` (case-insensitive, whitespace tolerant).
     public init?(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if (s.hasPrefix("rgb(") || s.hasPrefix("rgba(")) && s.hasSuffix(")") {
+            guard let openIdx = s.firstIndex(of: "(") else { return nil }
+            let body = s[s.index(after: openIdx)..<s.index(before: s.endIndex)]
+            let parts = body
+                .replacingOccurrences(of: "/", with: ",")
+                .split(whereSeparator: { $0 == "," || $0.isWhitespace })
+                .map { String($0).trimmingCharacters(in: .whitespaces) }
+            guard parts.count >= 3 else { return nil }
+            func parseComponent(_ token: String) -> Double? {
+                if token.hasSuffix("%") {
+                    guard let v = Double(token.dropLast()), v.isFinite else { return nil }
+                    return clamp01(v / 100.0)
+                }
+                guard let v = Double(token), v.isFinite else { return nil }
+                return clamp01(v / 255.0)
+            }
+            guard let rVal = parseComponent(parts[0]),
+                  let gVal = parseComponent(parts[1]),
+                  let bVal = parseComponent(parts[2]) else { return nil }
+            self.init(r: rVal, g: gVal, b: bVal)
+            return
+        }
         if s.hasPrefix("#") { s.removeFirst() }
         if s.hasPrefix("0x") { s.removeFirst(2) }
         if s.count == 3 {
             s = s.map { "\($0)\($0)" }.joined()
+        } else if s.count == 8 {
+            // #RRGGBBAA -> take RRGGBB
+            s = String(s.prefix(6))
         }
         guard s.count == 6, let value = UInt32(s, radix: 16) else { return nil }
         self.init(
@@ -61,7 +86,7 @@ public struct RGB: Codable, Hashable, Sendable {
         self.init(r: ColorMath.linearToSRGB(linear.r), g: ColorMath.linearToSRGB(linear.g), b: ColorMath.linearToSRGB(linear.b))
     }
 
-    // MARK: HSV
+    // MARK: HSV / HSB
 
     /// Hue in degrees 0..<360, saturation and value 0...1.
     public var hsv: (h: Double, s: Double, v: Double) {
@@ -75,6 +100,12 @@ public struct RGB: Codable, Hashable, Sendable {
         }
         let s = maxC <= 1e-9 ? 0 : delta / maxC
         return (wrapDegrees(h), s, maxC)
+    }
+
+    /// Hue in degrees 0..<360, saturation and brightness 0...1.
+    public var hsb: (h: Double, s: Double, b: Double) {
+        let v = hsv
+        return (v.h, v.s, v.v)
     }
 
     public init(hue: Double, saturation: Double, value: Double) {
@@ -94,6 +125,39 @@ public struct RGB: Codable, Hashable, Sendable {
         }
         self.init(r: r1 + m, g: g1 + m, b: b1 + m)
     }
+
+    public init(hue: Double, saturation: Double, brightness: Double) {
+        self.init(hue: hue, saturation: saturation, value: brightness)
+    }
+
+    // MARK: HSL
+
+    /// Hue in degrees 0..<360, saturation and lightness 0...1.
+    public var hsl: (h: Double, s: Double, l: Double) {
+        ColorMath.rgbToHSL(self)
+    }
+
+    public init(hue: Double, saturation: Double, lightness: Double) {
+        self = ColorMath.hslToRGB(h: hue, s: saturation, l: lightness)
+    }
+
+    // MARK: OKLab / OKLCh / XYZ
+
+    public var okLab: (L: Double, a: Double, b: Double) {
+        ColorMath.linearToOKLab(linear)
+    }
+
+    public var okLCh: (L: Double, C: Double, h: Double) {
+        ColorMath.linearToOKLCh(linear)
+    }
+
+    public var xyz: (X: Double, Y: Double, Z: Double) {
+        ColorMath.linearSRGBToXYZ(linear)
+    }
+
+    public var xy: (x: Double, y: Double) {
+        ColorMath.linearSRGBToXY(linear)
+    }
 }
 
 /// Linear-light RGB (sRGB/Rec.709 primaries). Components are nominally 0...1 but may exceed
@@ -108,8 +172,10 @@ public struct LinearRGB: Codable, Hashable, Sendable {
     }
 
     public static let black = LinearRGB(r: 0, g: 0, b: 0)
+    public static let white = LinearRGB(r: 1, g: 1, b: 1)
 
     public var maxComponent: Double { max(r, g, b) }
+    public var minComponent: Double { min(r, g, b) }
 
     /// Scales so the largest component is 1 (keeps chromaticity). Black stays black.
     public var normalized: LinearRGB {
@@ -130,6 +196,10 @@ public struct LinearRGB: Codable, Hashable, Sendable {
         LinearRGB(r: lhs.r + rhs.r, g: lhs.g + rhs.g, b: lhs.b + rhs.b)
     }
 
+    public static func - (lhs: LinearRGB, rhs: LinearRGB) -> LinearRGB {
+        LinearRGB(r: lhs.r - rhs.r, g: lhs.g - rhs.g, b: lhs.b - rhs.b)
+    }
+
     /// Relative luminance (Y) for sRGB primaries.
-    public var luminance: Double { 0.2126 * r + 0.7152 * g + 0.0722 * b }
+    public var luminance: Double { 0.2126729 * r + 0.7151522 * g + 0.0721750 * b }
 }
