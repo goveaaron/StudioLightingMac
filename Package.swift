@@ -35,10 +35,13 @@ var targets: [Target] = [
     ),
 ]
 
-var dependencies: [Package.Dependency] = []
+// swift-nio stays declared in core-only mode (fetched from SwiftPM's shared cache but never
+// compiled) so `Package.resolved` is never rewritten or deleted by core-only builds.
+let dependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
+]
 
 if !coreOnly {
-    dependencies.append(.package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"))
     products += [
         .library(name: "PrismServer", targets: ["PrismServer"]),
         .executable(name: "PrismDevServer", targets: ["PrismDevServer"]),
