@@ -1,0 +1,589 @@
+# fpStore format — the inner preset plist
+
+Every `LXPreset` carries a `fpStore` field containing a **separate binary plist** (not NSKeyedArchiver — just a plain bplist). This inner plist is where the actual fixture-state data lives.
+
+## Loading an existing fpStore
+
+```python
+import plistlib
+fp_bytes = objects[int(preset['fpStore'])]  # raw bytes
+inner = plistlib.loads(fp_bytes)
+print(inner.keys())
+```
+
+## Schema — older (umbrellaContainers)
+
+This is the schema the reference project uses. All current patterns in this documentation target this schema.
+
+```python
+{
+    'isMutable': False,
+    'umbrellaContainers': {
+        '<fixture-uuid-string>': {
+            'definedFeatures': ['Intensity', 'Color', ...],   # which channels this preset touches
+            'fixtureContainer': {
+                # per-fixture (not per-beam) settings — rarely used
+                # 'speedMode': 1, 'vectorSpeed': 1.0 for moving heads with speed control
+            },
+            'segmentContainers': [
+                {
+                    # per-beam state — one entry per fixture segment (most fixtures have 1)
+                    'intensity': 0.75,              # 0.0 .. 1.0
+                    'color': [packed_color_int64],  # see colour packing below
+                    'xfadeToColor': 1.0,            # crossfade amount — always 1.0 for instant colour
+                    'panAngle': -0.3,               # radians (moving heads only)
+                    'tiltAngle': 1.2,
+                    'shutterState': 1,              # 1 = open, 2 = strobe (+ strobeSpeed) — see below
+                    'strobeSpeed': ...,             # if shutter is strobing
+                    'coolWhite': ...,               # additional RGB+CW/WW channels
+                },
+                # ... one segment container per beam for multi-beam fixtures
+            ],
+        },
+        # ... more fixture UUIDs
+    },
+}
+```
+
+### Key facts
+
+- **Each key in `umbrellaContainers` is a fixture UUID string** — specifically, the `UUID` of the `LXDMXFixture` object. Not the beam UUID — these are the same thing in current Lightkey files.
+- **Missing fixtures = "don't touch"**. If a preset omits a fixture, Lightkey leaves that fixture's state to whatever lower-priority cue is driving it (or the default). This is how LTP layering works.
+- **`definedFeatures`** is an allowlist of what the preset controls. Include ONLY the features you want to drive. A colour-only preset that still includes `'Intensity'` in `definedFeatures` will clobber intensity (even if you didn't set a value). Features are plain words (`'Color'`, `'Intensity'`, `'PanTilt'`, `'Shutter'`, `'Speed'`) only where Lightkey has a built-in feature for the channel; anything else — a Macro, Function, Haze or Fan Speed channel — is named by a generated `custom--<profile>--<personality>--<index>` string and valued in `fixtureContainer` (see Custom capabilities).
+- **`shutterState`**: 1 = open, 2 = strobe (with `strobeSpeed` in Hz). "Closed" has never been observed as a distinct code — every off preset relies on `intensity: 0`. Decode the enum from the fixture profile's `LXShutterStrobeCapability.settings` (see Moving-head practicalities).
+
+## Schema — newer (containers)
+
+Observed in Lightkey's own Effects Showcase project. The tooling here does not build in this schema yet — contributions welcome (see CONTRIBUTING.md).
+
+```python
+{
+    'isMutable': False,
+    'containers': {
+        '<fixture-uuid>': {
+            'content': {},          # per-fixture
+            'subcontainers': [
+                {
+                    'content': {
+                        # per-beam state: color, intensity, shutterState, etc.
+                    },
+                },
+            ],
+        },
+    },
+}
+```
+
+No `definedFeatures` array — features seem to be inferred from which keys are present in `content`. This is a cleaner schema but I haven't reverse-engineered it fully.
+
+## Colour packing
+
+> **CORRECTED 2026-06.** Earlier revisions of this document said red occupied bits 0–15.
+> **That is wrong**, and it is the single most expensive error in this documentation's history: a
+> whole venue rig was programmed with "fire red" and every fixture rendered **blue**.
+> Verified empirically against Lightkey's own native colour picker across 16 hand-named
+> presets — every one matched an R↔B transposition with green fixed.
+
+Colour values are stored as **64-bit integers** with four 16-bit channels, **blue lowest**:
+
+```
+bits  0-15: Blue   (0x0000 - 0xFFFF)
+bits 16-31: Green
+bits 32-47: Red
+bits 48-63: Alpha  (usually 0x0000 for RGB fixtures)
+```
+
+Packing and unpacking in Python:
+
+```python
+def pack_color(r16, g16, b16, a16=0):
+    return ((b16 & 0xFFFF) | ((g16 & 0xFFFF) << 16) |
+            ((r16 & 0xFFFF) << 32) | ((a16 & 0xFFFF) << 48))
+
+def c8(r, g, b):                      # convenience: 8-bit RGB in, packed out
+    return pack_color(r * 257, g * 257, b * 257)
+
+def unpack_rgb8(packed):              # for validating your own output
+    return (((packed >> 32) & 0xFFFF) >> 8,
+            ((packed >> 16) & 0xFFFF) >> 8,
+            (packed & 0xFFFF) >> 8)
+```
+
+Common colours (16-bit values):
+
+| Name | R | G | B |
+|---|---|---|---|
+| White | 0xFFFF | 0xFFFF | 0xFFFF |
+| Warm white | 0xFFFF | 0xC000 | 0x5000 |
+| Red | 0xFFFF | 0x0000 | 0x0000 |
+| Amber | 0xFFFF | 0x6000 | 0x0000 |
+| Green | 0x0000 | 0xFFFF | 0x0000 |
+| Cyan | 0x0000 | 0xFFFF | 0xFFFF |
+| Blue | 0x0000 | 0x0000 | 0xFFFF |
+| Magenta | 0xFFFF | 0x0000 | 0xFFFF |
+
+(The table is channel values, not bit positions — `pack_color` places them correctly.)
+
+Colour is stored as a **single-element list** in the segment: `'color': [pack_color(...)]`. The list wrapper is required — plain ints are rejected.
+
+### Always prove the byte order on the user's own file
+
+Do not trust this document, and do not trust a symmetric test colour. Before generating a
+palette, decode a colour the user made **in Lightkey's GUI** and named unambiguously
+("Red", "Deep Blue"). Grey, white and amber-ish colours look identical under either byte
+order — pick a saturated primary:
+
+```python
+fp = plistlib.loads(objects[int(preset['fpStore'])])
+seg = next(iter(fp['umbrellaContainers'].values()))['segmentContainers'][0]
+print(hex(seg['color'][0]))       # a GUI-made "Red" must decode red under unpack_rgb8
+```
+
+If the user says a colour "comes out wrong on the rig", suspect this before suspecting
+fixture wiring or DMX personality — especially when Lightkey's own colour picker behaves
+correctly, which proves the fixture profile is fine and the bug is in your packing.
+
+### Ship a calibration row on first colour work
+
+For a new rig, add a temporary row of unmistakable single-hue buttons (`Cal RED`,
+`Cal GREEN`, `Cal BLUE`) and ask the user to press each and report what they see. It costs
+three cues and settles byte order, fixture profile and colour-mixing questions in one pass.
+Remove it once confirmed.
+
+## Writing an fpStore
+
+```python
+import plistlib
+
+def build_fpstore(fixture_specs):
+    """fixture_specs: {fixture_uuid_str: {
+            'defined_features': ['Intensity', 'Color'],
+            'segment': {
+                'intensity': 1.0,
+                'color': [pack_color(0xFFFF, 0, 0)],
+                'xfadeToColor': 1.0,
+            },
+            'fixture_container': {},  # optional
+        }}
+    Returns the raw bytes to set as the preset's fpStore.
+    """
+    umbrella = {}
+    for fx, spec in fixture_specs.items():
+        umbrella[fx] = {
+            'definedFeatures': spec['defined_features'],
+            'fixtureContainer': spec.get('fixture_container', {}),
+            'segmentContainers': [spec['segment']],
+        }
+    return plistlib.dumps(
+        {'isMutable': False, 'umbrellaContainers': umbrella},
+        fmt=plistlib.FMT_BINARY,
+    )
+```
+
+The returned bytes go into `$objects` as a plain bytes entry (no class wrapper), referenced from the preset's `fpStore` field.
+
+## Segment key vocabulary (everything observed in real files)
+
+| Key | Where | Meaning |
+|---|---|---|
+| `intensity` | segment | 0.0–1.0 |
+| `color` | segment | **list** of one packed 64-bit int (see Colour packing) |
+| `xfadeToColor` | segment | always `1.0` alongside `color` |
+| `coolWhite` | segment | 0.0–1.0, the white channel of an RGB+W fixture; only for fixtures with a 4th `LXColorComponentCapability`. `color (255,255,255)` + `coolWhite 1.0` is the strongest white such a fixture has |
+| `shutterState` | segment | `1` open, `2` strobe (with `strobeSpeed`) — see `class-schemas.md` → Fixture profiles for how to decode it from *your* profile |
+| `strobeSpeed` | segment | Hz; 2–16 seen in GUI-made presets |
+| `panAngle`, `tiltAngle` | segment | radians; sign/mirroring is per rig — derive from aims the user has confirmed |
+| `speedMode`, `vectorSpeed` | fixtureContainer | `1`, `1.0` on every moving-head preset seen; copy them whenever you write `PanTilt` |
+| `custom--<PROFILE UUID>--<personality>--<index>` | fixtureContainer | `[settingIndex, fraction]` for a capability Lightkey has no built-in feature for — Macro, Function, Haze, Fan Speed. See Custom capabilities below |
+
+`definedFeatures` must list exactly the features whose keys are present: `Color` ↔ `color`,
+`Intensity` ↔ `intensity`, `Shutter` ↔ `shutterState`, `PanTilt` ↔ `panAngle/tiltAngle` (+
+`Speed` with the fixtureContainer speed keys). A feature named without its key, or a key without
+its feature, is the kind of shape Lightkey rejects silently — assert the correspondence in your
+validator.
+
+Not every feature is a plain word like `Color`. A capability the app has no built-in feature for —
+an `LXCustomCapability`, such as a Macro, Function, Haze or Fan Speed channel — is named in
+`definedFeatures` by a generated `custom--…` string instead, and its value lives in
+`fixtureContainer` rather than a segment. See the next section.
+
+## Custom capabilities (`LXCustomCapability`)
+
+A capability that isn't one of Lightkey's built-in features appears in `definedFeatures` as a
+generated string rather than a word:
+
+```
+custom--<PROFILE UUID, UPPERCASE>--<personalityIndex>--<index>
+```
+
+The UUID is the profile's own `UUID`, uppercased — read it from your file, don't expect the one
+another rig quotes to mean anything on yours.
+
+`<index>` is the capability's position in that personality's `capabilities` array **after sorting
+by `channel`** (the channel offset), not its raw position in the array. The two differ often
+enough that reading the raw index straight out of the file will address the wrong channel.
+Two profiles in one project pin this down from both directions:
+
+- A two-channel hazer personality stores its capabilities in the array as
+  `[ch1 'Fan Speed', ch0 'Haze']` — reversed relative to channel order — and addresses them as
+  `--0--0` = Haze and `--0--1` = Fan Speed. Sorted order, not array order.
+- A seven-channel wash personality, already in channel order, addresses `--<p>--6` as its
+  'Function Speed' capability, channel 6 of 0..6. The sort is a no-op here, so this case alone
+  would not have caught the rule — it's the pair that proves it.
+
+The **value** does not go in a `segmentContainer`. It goes in that fixture's `fixtureContainer`
+under the same key, as a two-element list:
+
+```python
+[settingIndex, fractionWithinThatSetting]
+```
+
+- `settingIndex` indexes the capability's own `settings` array. Each `LXSetting` carries `$0` — an
+  `_NSKeyedCoderOldStyleArray` whose `$0` is the DMX range start and `$1` the range end, with `-1`
+  meaning 255 — plus `params`, either `{'name': 'Output High'}` or `{'continuous': True}`.
+- `fraction` is `0.0`–`1.0` within that DMX band, so `0.0` lands on the bottom of the range.
+
+**The DMX range bytes are signed** (`NS.type` 67 = signed char), so anything above 127 reads
+negative. Mask with `& 0xFF` before comparing or sorting ranges.
+
+### Worked example
+
+The v19 preset named '0%, Haze Output High, Fan Speed 100%' drives the hazer's two custom
+channels and nothing else:
+
+```python
+HAZER_PROFILE = '...'   # that profile's own UUID, uppercased, read from your file
+
+def custom_feature(profile_uuid, personality, index):
+    return f'custom--{profile_uuid}--{personality}--{index}'
+
+haze = custom_feature(HAZER_PROFILE, 0, 0)    # channel 0 — Haze
+fan  = custom_feature(HAZER_PROFILE, 0, 1)    # channel 1 — Fan Speed
+
+build_fpstore({
+    HAZER_FIXTURE_UUID: {
+        'defined_features': [haze, fan],
+        'fixture_container': {
+            haze: [2, 0.0],   # settings[2] = 'Output High' (DMX 128–255); 0.0 = bottom of it
+            fan:  [0, 1.0],   # the single continuous 0–255 setting, at full
+        },
+        'segment': {},        # no segment keys at all
+    },
+})
+```
+
+Derive the setting indices from the profile in *the user's own file* rather than hard-coding them —
+read the capability's `settings`, mask each range with `& 0xFF`, and look up the `params['name']`
+you want. The reference project's build script does exactly this, asserting the capability names
+and the ascending DMX order against the profile in the file before it emits a single key — if the
+profile isn't shaped the way the script expects, it stops rather than writing a preset that points
+at the wrong channel.
+
+### Built-in programmes and modes, in practice
+
+Macro channels with built-in programmes, "sound active", an LED bar's "Function" and "Function
+Speed" follow the same encoding. What a weekly-revised live show added to it:
+
+* **`personalityIndex` is the fixture's own** — the personality it is patched in. A key written
+  for another personality is kept in the file and silently does nothing.
+* **The array order is not stable, which is why the sort matters.** Lightkey reorders a
+  personality's `capabilities` array from one save to the next: in one profile, array position 6
+  held channel 5, 2, 0, 5 and 1 across five re-saves, while the sorted-by-channel position of every
+  key Lightkey itself wrote landed on the named capability every time. See `pitfalls.md` Bug 32.
+* **`fraction` 0.5 lands mid-band** on a stepped setting such as "Program Effect 1" (DMX 96–107):
+  safer than 0.0 if a fixture's bands are narrower than the profile says. Continuous settings such
+  as a speed take the real fraction (`[0, 0.5]` = half speed).
+* **Lightkey omits a default value (`[0, 0.0]`) when it re-saves:** the key stays in
+  `definedFeatures`, the `fixtureContainer` entry disappears. Both forms mean the first setting.
+* **Print the table from the profile in the user's file, never from memory:**
+
+```python
+pers = kids(profile['personalities'])[fixture['personalityIndex']]
+caps = sorted((objs[c] for c in kids(objs[pers]['capabilities'])), key=lambda c: c['channel'])
+for i, cap in enumerate(caps):
+    if txt(cap.get('customName')) not in (None, '$null'):
+        settings = [params(objs[s])['name'] for s in kids(cap['settings'])]
+        print(i, txt(cap['customName']), settings)      # i is the capability_index
+```
+
+* A built-in programme usually overrides the fixture's RGB, but its dimmer still applies: give the
+  preset `Intensity` (and `Shutter` open where the profile has one) or the programme runs dark.
+* **If a cue carrying a correct custom value "does nothing" but the same function works from
+  Lightkey's Design view, the encoding is fine — another cue is outranking it.** Design overrides
+  every cue. See `pitfalls.md` Bug 30.
+
+## Common segment shapes
+
+### Intensity-only dimmer
+
+```python
+{'intensity': 0.5}   # definedFeatures: ['Intensity']
+```
+
+### Colour-only (doesn't touch intensity)
+
+```python
+{'color': [pack_color(0xFFFF, 0, 0)], 'xfadeToColor': 1.0}
+# definedFeatures: ['Color']
+```
+
+### Colour + intensity together
+
+```python
+{
+    'color': [pack_color(0xFFFF, 0, 0)],
+    'xfadeToColor': 1.0,
+    'intensity': 1.0,
+}
+# definedFeatures: ['Color', 'Intensity']
+```
+
+### Moving head (pan + tilt + intensity + shutter)
+
+```python
+{
+    'intensity': 1.0,
+    'panAngle': -0.3,        # radians; 0.0 = centre
+    'tiltAngle': 1.2,        # radians; 0.0 = horizontal, + = up
+    'shutterState': 1,       # 1 = open
+}
+# definedFeatures: ['PanTilt', 'Intensity', 'Shutter']
+# fixture_container can optionally include speed: {'speedMode': 1, 'vectorSpeed': 1.0}
+```
+
+### Moving head with colour override
+
+```python
+{
+    'intensity': 1.0,
+    'panAngle': -0.3, 'tiltAngle': 1.2,
+    'shutterState': 1,
+    'color': [pack_color(0xFFFF, 0, 0xFFFF)],
+    'xfadeToColor': 1.0,
+}
+# definedFeatures: ['PanTilt', 'Intensity', 'Shutter', 'Color']
+```
+
+### Moving-head practicalities
+
+Notes for moving-head beams. Pan and tilt ranges vary by fixture; read them from the
+profile rather than assuming, and confirm every aim on the rig:
+
+* **`shutterState`: 1 = open, 2 = STROBE (paired with `strobeSpeed`, Hz).** There is no
+  proven "closed" code. Every "off" preset that used `shutterState: 2` only looked closed
+  because it also set `intensity: 0.0` — with intensity up, 2 strobes. For an off position
+  set `'intensity': 0.0` and **`'shutterState': 1`** (open) so a layered cue that raises
+  intensity never triggers a strobe by accident. To strobe deliberately:
+  `{'shutterState': 2, 'strobeSpeed': 9.0}` (2–16 Hz seen in real files).
+  **Decode the enum from the user's own profile before trusting this:** each
+  `LXShutterStrobeCapability.settings` entry is an `LXSetting` with a DMX range and
+  `params: {'mode': n}` — the narrow range (e.g. 0–6 or 240–255) is *open* (`mode 1`),
+  the wide range is the strobe sweep (`mode 2`). The number Lightkey writes into
+  `shutterState` is that `mode`.
+* **Mirror the pan, not the tilt.** House-right heads take `-pan` of house-left; tilt is
+  shared. A single builder covering both sides removes a whole class of asymmetry bugs:
+  ```python
+  MOVERS_LEFT, MOVERS_RIGHT = ['MH_L1', 'MH_L2'], ['MH_R1', 'MH_R2']
+  def fp_mh(pan_l, tilt, pan_r=None, inten=1.0, off=False):
+      pan_r = -pan_l if pan_r is None else pan_r
+      ...
+  ```
+  If the beams cross when they should splay, flip that sign once at the top rather than
+  editing every position.
+* **Full feature list** for a position preset is `['Intensity', 'PanTilt', 'Shutter', 'Speed']`,
+  with `fixtureContainer = {'speedMode': 1, 'vectorSpeed': 1.0}`.
+* **Aims are radians, and they are rig-specific.** Negative tilt around -1.1 rad tends to
+  point down onto the stage and tilt near +π/2 up at the ceiling, but sign conventions and
+  zero points differ per fixture and per patch. Get two aims confirmed on the actual rig
+  (one down, one up) and derive every other position from those. Tilt above roughly 1.2 rad
+  is "into the air" — safe, and the only place beams look good through haze.
+* **A misaligned head is usually physical.** If one head points somewhere the others don't
+  while its stored `panAngle`/`tiltAngle` are identical, the problem is the fixture's own
+  pan/tilt home or its mounting — not the file. Say so instead of patching offsets in.
+* **Movement is a sequence of positions**, with `autoreverses=True` and
+  `smoothesFixtureMovements=True`. Slow arcs need a large `crossfadeDuration` (9 s+) and a
+  short `holdDuration` (< 1.5 s) — the crossfade *is* the movement.
+
+## The crucial separation: dimmer preset vs colour preset
+
+When building radio groups, make dimmer presets and colour presets **independent** — each targeting only its own features:
+
+```python
+# Dimmer preset — intensity only
+{
+    '<fix_uuid>': {
+        'defined_features': ['Intensity'],
+        'segment': {'intensity': 0.5},
+    }
+}
+
+# Colour preset — colour only (NO intensity)
+{
+    '<fix_uuid>': {
+        'defined_features': ['Color'],
+        'segment': {'color': [pack_color(r, g, b)], 'xfadeToColor': 1.0},
+    }
+}
+```
+
+If your colour preset also sets `intensity: 1.0`, activating Red while 50%-dim is active will **override your 50% with 100%** because LTP takes the last value for any feature you declared. Keeping them separate lets them layer.
+
+See `patterns.md` for the full radio-group-with-LTP pattern.
+
+---
+
+## The third top-level key: `effects` (native Lightkey effects)
+
+Reverse-engineered from a user-curated reference project. This is how Lightkey's "Effects" pulldown (pulse, multi-colour blend, waterfall chase, etc.) is stored when applied via the GUI.
+
+```python
+{
+    'isMutable': False,
+    'umbrellaContainers': { ... },
+    'effects': [  # <-- new top-level array
+        {
+            'effectClass': 1000,
+            'feature': 'Intensity',
+            'extent': {
+                '<fixture-uuid>': {'all': {}},
+                # ... one entry per fixture the effect targets
+            },
+            'parameters': b'<opaque binary blob>',
+            'pixelOrder': {'type': 65536},
+            'pixelOrderGranularity': 0,
+        },
+        # ... multiple effects can stack
+    ],
+}
+```
+
+### Effect class identifiers
+
+Observed values for `effectClass` and the feature they pair with. The skill has no full taxonomy yet — these are confirmed by inspection only:
+
+| effectClass | feature | Observed in |
+|---|---|---|
+| 1000 | `'Intensity'` | intensity layers on GUI-made scenes — soft pulse curves |
+| 1000 | `'Color'` | colour layers on GUI-made scenes — colour cycle / chase |
+| 2000 | `'PanTilt'` | moving-head movement effects |
+| 3000 | `'Intensity'` | gentler intensity fades |
+| 6000 | `'Color'` | multi-colour blend |
+
+### The `extent` field
+
+A dict keyed by **fixture UUID** (uppercase string), each value being `{'all': {}}`. The effect applies to every listed fixture. This is the field you re-target when cloning an effect to a different fixture set.
+
+### The `parameters` field
+
+An **opaque binary blob** that encodes the actual effect tuning — colour palette, speed, curve shape, randomisation, etc. The format is not reverse-engineered. **You cannot synthesise these bytes from scratch.**
+
+### The `pixelOrder` field
+
+Determines the spatial order in which the effect plays across fixtures (for chases/waterfalls).
+
+```python
+'pixelOrder': {'type': 65536}                       # default sequential
+'pixelOrder': {'type': 65539}                       # randomised
+'pixelOrder': {'type': 524288,                       # custom-ordered
+               'orderedPixelRefs': [
+                   0.0, [{'fixtureID': '<uuid>'}, ...],
+                   1.0, [{'fixtureID': '<uuid>'}],
+                   2.0, [{'fixtureID': '<uuid>'}],
+                   # ... step index, fixtures-at-that-step
+               ]}
+```
+
+`orderedPixelRefs` is a flat list alternating `float_step_index, list_of_fixture_refs`. The step index defines firing order; multiple fixtures can fire simultaneously by sharing an index.
+
+## The Clone-and-Retarget pattern
+
+Because `parameters` is opaque, the only reliable way to produce a new "native effect" preset is to clone an effect from a reference file and re-target its extent.
+
+### Extraction (one-time)
+
+```python
+import plistlib, pickle
+from resolve import load, find_instances
+from plistlib import UID
+
+_, refs = load('reference.lightkeyproj')
+
+def getstr(o, ref):
+    if not isinstance(ref, UID): return None
+    v = o[int(ref)]
+    return v if isinstance(v, str) else v.get('NS.string') if isinstance(v, dict) else None
+
+# Save (preset_name, effect_index, effect_dict) tuples
+candidates = []
+for u in find_instances(refs, 'LXPreset'):
+    p = refs[u]
+    name = getstr(refs, p.get('name'))
+    fp_ref = p.get('fpStore')
+    if not isinstance(fp_ref, UID): continue
+    fp = plistlib.loads(refs[int(fp_ref)])
+    for i, eff in enumerate(fp.get('effects', [])):
+        if eff['feature'] != 'Intensity': continue  # filter to intensity effects
+        candidates.append((name, i, eff))
+
+with open('intensity_effects.pkl', 'wb') as f:
+    pickle.dump(candidates, f)
+```
+
+### Cloning into a new preset
+
+```python
+import copy
+
+def find_intensity_effect(preset_name, idx):
+    for n, i, eff in INTENSITY_FX:
+        if n == preset_name and i == idx:
+            return copy.deepcopy(eff)
+    raise KeyError(f'{preset_name}#{idx}')
+
+def fp_intensity_effect_for(target_keys, ref_preset, ref_idx, baseline=1.0):
+    """Build fpStore with a cloned intensity effect retargeted to `target_keys`."""
+    eff = find_intensity_effect(ref_preset, ref_idx)
+    eff['extent'] = {FIX_UUID[k]: {'all': {}} for k in target_keys}
+
+    umbrella = {}
+    for k in target_keys:
+        seg = {'intensity': float(baseline)}
+        feats = ['Intensity']
+        if k in MOVING_HEADS:
+            seg['shutterState'] = 1
+            feats = ['Intensity', 'Shutter']
+        umbrella[FIX_UUID[k]] = {
+            'definedFeatures': feats,
+            'fixtureContainer': {},
+            'segmentContainers': [seg],
+        }
+    return plistlib.dumps({
+        'isMutable': False,
+        'umbrellaContainers': umbrella,
+        'effects': [eff],
+    }, fmt=plistlib.FMT_BINARY)
+```
+
+### Why this works
+
+- The `parameters` bytes describe the EFFECT (curve, palette, speed) — they don't bind to specific fixtures.
+- The `extent` dict describes WHICH FIXTURES the effect plays on — entirely safe to mutate.
+- The `umbrellaContainers` declares the baseline state on each target fixture — separately editable.
+
+So you can take "Pulse Slow" out of one reference preset, point it at a different fixture set, and you've got the same curve playing on new lights.
+
+### Verbatim clone (no retargeting)
+
+When you want to expose a reference project's existing scenes as buttons unchanged, just copy the entire fpStore bytes without modification. The original UUIDs in `extent` and `umbrellaContainers` reference the same fixtures (assuming the project's UUIDs are unchanged).
+
+```python
+def clone_preset(b, name, fp_bytes):
+    return mk_preset(b, name, fp_bytes)
+```
+
+## When NOT to use the effects array
+
+- **Static colour scenes** — just set `color` in the segment, no effect needed.
+- **Per-fixture-varying intensity sequences** — use `LXSequence` with multiple step presets that have explicit per-fixture intensities in `umbrellaContainers`. Native effects apply uniformly across their `extent` and can't express "G1 bright while G2 dim" alternation.
+- **Beat-locked rhythms** — native effects don't BPM-sync. Use sequence step timing derived from BPM (hold + crossfade = beat duration).
+
