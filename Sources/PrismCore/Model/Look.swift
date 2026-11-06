@@ -1,5 +1,94 @@
 import Foundation
 
+/// Easing curves for look crossfades and layer transitions.
+public enum FadeCurve: String, Codable, CaseIterable, Sendable, Identifiable {
+    case linear
+    case easeInOut
+    case sCurve
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .linear: return "Linear"
+        case .easeInOut: return "Ease In–Out"
+        case .sCurve: return "S-Curve"
+        }
+    }
+
+    /// Evaluates the curve at linear progress `t` in 0…1.
+    @inline(__always)
+    public func evaluate(_ t: Double) -> Double {
+        let p = clamp01(t.finiteOr(0))
+        switch self {
+        case .linear:
+            return p
+        case .easeInOut:
+            return p * p * (3 - 2 * p)
+        case .sCurve:
+            return p * p * p * (p * (p * 6 - 15) + 10)
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = FadeCurve(rawValue: raw) ?? .easeInOut
+    }
+}
+
+/// Named crossfade timing presets shared by the UI, Live page, and commands.
+public enum FadePreset: String, Codable, CaseIterable, Sendable, Identifiable {
+    case snap
+    case quick
+    case smooth
+    case slow
+    case cinematic
+
+    public var id: String { rawValue }
+
+    /// Crossfade duration in seconds: Snap 0 s, Quick 0.4 s, Smooth 1.5 s, Slow 4 s, Cinematic 10 s.
+    public var duration: Double {
+        switch self {
+        case .snap: return 0.0
+        case .quick: return 0.4
+        case .smooth: return 1.5
+        case .slow: return 4.0
+        case .cinematic: return 10.0
+        }
+    }
+
+    public var seconds: Double { duration }
+
+    public var displayName: String {
+        switch self {
+        case .snap: return "Snap"
+        case .quick: return "Quick"
+        case .smooth: return "Smooth"
+        case .slow: return "Slow"
+        case .cinematic: return "Cinematic"
+        }
+    }
+
+    public var shortLabel: String {
+        switch self {
+        case .snap: return "0s"
+        case .quick: return "0.4s"
+        case .smooth: return "1.5s"
+        case .slow: return "4s"
+        case .cinematic: return "10s"
+        }
+    }
+
+    public static func matching(duration: Double, tolerance: Double = 0.05) -> FadePreset? {
+        allCases.first { abs($0.duration - duration) <= tolerance }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = FadePreset(rawValue: raw) ?? .smooth
+    }
+}
+
 /// A saved lighting look (Lightkey calls these presets). Can cover all fixtures or just some
 /// ("partial looks" layer on top of whatever else is on). May include running effects and
 /// music mode.
@@ -13,6 +102,14 @@ public struct Look: Codable, Hashable, Sendable, Identifiable {
     public var music: MusicModeSettings?
     /// Default crossfade time in seconds when recalled.
     public var fadeTime: Double
+    /// Crossfade curve when recalled.
+    public var fadeCurve: FadeCurve
+    /// Spatial wave delay across the stage in seconds ("wave across the room" by stage position).
+    public var spatialDelay: Double
+    /// Direction of the spatial delay wave across the stage.
+    public var delayDirection: EffectDirection
+    /// Optional explicit per-fixture delay overrides in seconds.
+    public var fixtureDelays: [UUID: Double]
     public var isFavorite: Bool
     /// Optional keyboard shortcut character.
     public var shortcut: String?
@@ -23,15 +120,21 @@ public struct Look: Codable, Hashable, Sendable, Identifiable {
 
     public init(id: UUID = UUID(), name: String, folderID: UUID? = nil, states: FixtureStateMap = FixtureStateMap(),
                 effects: [EffectInstance] = [], music: MusicModeSettings? = nil, fadeTime: Double = 1.0,
+                fadeCurve: FadeCurve = .easeInOut, spatialDelay: Double = 0,
+                delayDirection: EffectDirection = .leftToRight, fixtureDelays: [UUID: Double] = [:],
                 isFavorite: Bool = false, shortcut: String? = nil, sortIndex: Int = 0, notes: String = "",
                 createdAt: Date = Date(), modifiedAt: Date = Date()) {
         self.id = id; self.name = name; self.folderID = folderID; self.states = states; self.effects = effects
-        self.music = music; self.fadeTime = fadeTime; self.isFavorite = isFavorite; self.shortcut = shortcut
+        self.music = music; self.fadeTime = clamp(fadeTime.finiteOr(1), 0, 600); self.fadeCurve = fadeCurve
+        self.spatialDelay = clamp(spatialDelay.finiteOr(0), 0, 60); self.delayDirection = delayDirection
+        self.fixtureDelays = fixtureDelays.mapValues { clamp($0.finiteOr(0), 0, 60) }
+        self.isFavorite = isFavorite; self.shortcut = shortcut
         self.sortIndex = sortIndex; self.notes = notes; self.createdAt = createdAt; self.modifiedAt = modifiedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, folderID, states, effects, music, fadeTime, isFavorite, shortcut, sortIndex, notes, createdAt, modifiedAt
+        case id, name, folderID, states, effects, music, fadeTime, fadeCurve, spatialDelay, delayDirection,
+             fixtureDelays, isFavorite, shortcut, sortIndex, notes, createdAt, modifiedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -43,12 +146,51 @@ public struct Look: Codable, Hashable, Sendable, Identifiable {
         effects = try c.decodeIfPresent([EffectInstance].self, forKey: .effects) ?? []
         music = try c.decodeIfPresent(MusicModeSettings.self, forKey: .music)
         fadeTime = clamp((try c.decodeIfPresent(Double.self, forKey: .fadeTime) ?? 1).finiteOr(1), 0, 600)
+        fadeCurve = try c.decodeIfPresent(FadeCurve.self, forKey: .fadeCurve) ?? .easeInOut
+        spatialDelay = clamp((try c.decodeIfPresent(Double.self, forKey: .spatialDelay) ?? 0).finiteOr(0), 0, 60)
+        delayDirection = try c.decodeIfPresent(EffectDirection.self, forKey: .delayDirection) ?? .leftToRight
+        if let rawDelays = try c.decodeIfPresent([String: Double].self, forKey: .fixtureDelays) {
+            var d: [UUID: Double] = [:]
+            for (k, v) in rawDelays {
+                if let uid = UUID(uuidString: k) { d[uid] = clamp(v.finiteOr(0), 0, 60) }
+            }
+            fixtureDelays = d
+        } else {
+            fixtureDelays = [:]
+        }
         isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
         shortcut = try c.decodeIfPresent(String.self, forKey: .shortcut)
         sortIndex = try c.decodeIfPresent(Int.self, forKey: .sortIndex) ?? 0
         notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
         createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encodeIfPresent(folderID, forKey: .folderID)
+        try c.encode(states, forKey: .states)
+        try c.encode(effects, forKey: .effects)
+        try c.encodeIfPresent(music, forKey: .music)
+        try c.encode(fadeTime, forKey: .fadeTime)
+        if fadeCurve != .easeInOut { try c.encode(fadeCurve, forKey: .fadeCurve) }
+        if spatialDelay > 0 {
+            try c.encode(spatialDelay, forKey: .spatialDelay)
+            try c.encode(delayDirection, forKey: .delayDirection)
+        }
+        if !fixtureDelays.isEmpty {
+            var dict: [String: Double] = [:]
+            for (k, v) in fixtureDelays { dict[k.uuidString] = v }
+            try c.encode(dict, forKey: .fixtureDelays)
+        }
+        try c.encode(isFavorite, forKey: .isFavorite)
+        try c.encodeIfPresent(shortcut, forKey: .shortcut)
+        try c.encode(sortIndex, forKey: .sortIndex)
+        try c.encode(notes, forKey: .notes)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encode(modifiedAt, forKey: .modifiedAt)
     }
 
     /// Up to `max` representative display colors (for list thumbnails / dots).
