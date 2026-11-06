@@ -48,6 +48,12 @@ struct SheetRouter: View {
             case .hardwareTest: HardwareTestSheet()
             case .lightFinder: LightFinderSheet()
             case .welcome: WelcomeSheet()
+            case .templates: TemplatesSheet()
+            case .setupCards: SetupCardsSheet()
+            case .addressScan: AddressScanSheet()
+            case .troubleshooter: TroubleshooterSheet()
+            case .profileEditor: ProfileEditorSheet()
+            case .shareRemote: ShareRemoteSheet()
             }
         }
         .background(Theme.panel)

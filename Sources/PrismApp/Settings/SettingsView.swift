@@ -9,10 +9,22 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsPane()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            OutputSettingsPane()
+                .tabItem { Label("Outputs", systemImage: "cable.connector.horizontal") }
+            MusicSettingsPane()
+                .tabItem { Label("Music", systemImage: "waveform") }
+            AssistantSettingsPane()
+                .tabItem { Label("Assistant", systemImage: "sparkles") }
+            CameraSettingsPane()
+                .tabItem { Label("Camera", systemImage: "camera") }
+            RemoteSettingsPane()
+                .tabItem { Label("Remote", systemImage: "iphone.radiowaves.left.and.right") }
+            IntegrationsSettingsPane()
+                .tabItem { Label("Integrations", systemImage: "puzzlepiece.extension") }
             SafetySettingsPane()
                 .tabItem { Label("Safety", systemImage: "eye.trianglebadge.exclamationmark") }
         }
-        .frame(width: 560, height: 420)
+        .frame(width: 680, height: 480)
     }
 }
 

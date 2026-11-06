@@ -61,8 +61,9 @@
 Music reactivity : SystemAudioTap (14.2+) ─fallback→ ScreenCaptureAudioSource ─fallback→ MicInputSource (line-in / room mic)
 Voice control    : WakeWordListener (SFSpeechRecognizer, 14+)   or   ModernTranscriber (SpeechAnalyzer, 26+)
                    → OnDeviceLightingInterpreter (FoundationModels, 26+)
-                   → CloudLLMClient (user-supplied API key)
-                   → rule-based parser (always available)
+                   → CloudLightingInterpreter (user-supplied API key)
+                   → RuleBasedLightingParser (always available)
+                   (LightingCommandInterpreter in §3.5 runs this chain)
 Feedback         : Speaker (AVSpeechSynthesizer) · CameraManager + RegionColor (+ optional cloud vision check)
 ```
 
@@ -696,7 +697,7 @@ func startMusicInput(analyzer: AudioAnalyzer) async {
 - **Optional private status probe** (same technique as AudioCap). ⚠️ Private API: it may break in any update and must never be used for the App Store. The return mapping is inferred, not documented.
 
 ```swift
-import Darwin
+import Foundation   // Darwin (dlopen/dlsym) + CoreFoundation (CFString, `as CFString` bridging)
 
 /// ⚠️ PRIVATE TCC SPI. Inferred mapping: 0 = authorized, 1 = denied, anything else = not determined.
 enum AudioCaptureTCCProbe {
@@ -728,7 +729,7 @@ enum AudioCaptureTCCProbe {
       kAudioAggregateDeviceTapAutoStartKey: true,
       kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: outputUID]],
       kAudioAggregateDeviceTapListKey: [[kAudioSubTapDriftCompensationKey: true,
-                                         kAudioSubTapUIDKey: description.uuid.uuidString]],
+                                         kAudioSubTapUIDKey: description.uuid.uuidString] as [String: Any]],
   ]
   ```
 
@@ -1544,3 +1545,1609 @@ Notes:
 - **Echo into the mic.** For a mic-based wake word during playback, enable voice processing on the *speech* engine (§1.4), or simply pause recognition while speaking.
 
 ---
+
+## 3. On-device language understanding: Apple Foundation Models (macOS 26+)
+
+### 3.0 Facts (✅ checked against the macOS 26.5 SDK `FoundationModels.swiftinterface`)
+
+| Item | Detail |
+|---|---|
+| Availability | `SystemLanguageModel.default.availability` is `@frozen enum Availability { case available; case unavailable(UnavailableReason) }`. `UnavailableReason` is **not** frozen: `.deviceNotEligible`, `.appleIntelligenceNotEnabled`, `.modelNotReady` (still downloading). `isAvailable` is a Bool shortcut |
+| Hardware | Apple-silicon Mac with Apple Intelligence turned on and a supported language. Intel Macs and GitHub's macOS runner VMs report `.deviceNotEligible` |
+| Language | `supportsLocale(_ locale: Locale = .current) -> Bool`, `supportedLanguages: Set<Locale.Language>` |
+| Session | `final class LanguageModelSession` (`Observable`, `@unchecked Sendable`). `init(model: = .default, tools: [any Tool] = [], instructions: String? = nil)`; overloads take `Instructions` / an `@InstructionsBuilder` closure / a `Transcript` |
+| Request | `respond<Content: Generable>(to: String, generating: Content.Type = Content.self, includeSchemaInPrompt: Bool = true, options: GenerationOptions = GenerationOptions()) async throws -> Response<Content>`. It's `nonisolated(nonsending)`, so it runs on the caller's actor (calling it from `@MainActor` is fine). `Response` has `content`, `rawContent: GeneratedContent` and `transcriptEntries` |
+| Options | `GenerationOptions(sampling: .greedy / .random(top:seed:) / .random(probabilityThreshold:seed:), temperature: Double?, maximumResponseTokens: Int?)`. All parameters default to `nil` |
+| Warm-up | `prewarm(promptPrefix: Prompt? = nil)` |
+| One at a time | `isResponding: Bool`. A second request on a busy session throws `.concurrentRequests` |
+| Context window | **4,096 tokens per session.** This covers instructions, tool schemas, every prompt and response so far, and the injected output schema. `SystemLanguageModel.contextSize: Int` is back-deployed (returns 4096 before 26.4). `tokenCount(for:)` (prompt / instructions / tools / schema / transcript entries) is **macOS 26.4+** |
+| Errors | `LanguageModelSession.GenerationError` is not frozen: `exceededContextWindowSize`, `assetsUnavailable`, `guardrailViolation`, `unsupportedGuide`, `unsupportedLanguageOrLocale`, `decodingFailure`, `rateLimited`, `concurrentRequests` (each carries a `Context` with `debugDescription`), and `refusal(Refusal, Context)`. `Refusal.explanation` is `get async throws -> Response<String>`. Tools also throw `LanguageModelSession.ToolCallError` (`tool`, `underlyingError`) |
+| Macros | `@Generable(description: String? = nil)` on structs and enums. `@Guide(description:)`, `@Guide(description:_ guides: GenerationGuide<T>...)` and a `Regex` variant |
+| Guides | `Int` / `Float` / `Double` / `Decimal`: `.minimum`, `.maximum`, `.range`. `String`: `.anyOf([String])`, `.constant`, `.pattern(Regex)`. Arrays: `.minimumCount`, `.maximumCount`, `.count(Int or ClosedRange)`, `.element(guide)` |
+| Tool | `protocol Tool<Arguments, Output>: Sendable`. `Arguments: ConvertibleFromGeneratedContent` (in practice a `@Generable` struct). `Output: PromptRepresentable` (`String`, arrays of them, or any `@Generable` type). `description` is required; `name` defaults to the type name; `parameters` is derived from `Arguments`; `includesSchemaInInstructions` defaults to true. Requirement: `@concurrent func call(arguments: Arguments) async throws -> Output` |
+
+### 3.1 Shared command types (macOS 14+, no FoundationModels)
+
+Every interpreter produces the same `LightingCommandList`: on-device (§3.2), cloud (§4) and the rule parser (§3.5). Raw values are the wire format, and the cloud JSON schema is generated from `allCases`.
+
+```swift
+// LightingCommand.swift
+import Foundation
+
+enum LightTargetID: String, Codable, CaseIterable, Sendable {
+    case key, fill, back, left, right, top, bottom, front, background, all
+}
+
+enum LightOperationID: String, Codable, CaseIterable, Sendable {
+    case setColor          // color = name, "#RRGGBB" or "3200k"; amount 0
+    case adjustBrightness  // amount = relative change, -1...1
+    case setBrightness     // amount = absolute level, 0...1
+    case turnOn, turnOff
+}
+
+struct LightingCommand: Codable, Sendable, Equatable {
+    var target: LightTargetID
+    var operation: LightOperationID
+    var color: String      // "" when the color doesn't change
+    var amount: Double     // meaning depends on `operation`
+}
+
+struct LightingCommandList: Codable, Sendable, Equatable {
+    var actions: [LightingCommand]
+
+    /// Clamp numbers, normalize colors, drop no-ops and cap the count.
+    /// Apply this to every source: not all schema dialects can enforce numeric ranges (§4).
+    func sanitized(maxActions: Int = 12) -> LightingCommandList {
+        var result: [LightingCommand] = []
+        for var action in actions.prefix(maxActions) {
+            action.color = action.color.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            switch action.operation {
+            case .adjustBrightness: action.amount = min(max(action.amount, -1), 1)
+            case .setBrightness: action.amount = min(max(action.amount, 0), 1)
+            case .setColor, .turnOn, .turnOff: action.amount = 0
+            }
+            if action.operation == .setColor && action.color.isEmpty { continue }
+            if action.operation == .adjustBrightness && action.amount == 0 { continue }
+            result.append(action)
+        }
+        return LightingCommandList(actions: result)
+    }
+}
+
+/// Full-intensity color (max channel = 1). Brightness is a separate control.
+struct RGB: Sendable, Equatable {
+    var r: Double
+    var g: Double
+    var b: Double
+}
+
+enum ColorNameResolver {
+    static let table: [String: RGB] = [
+        "red": RGB(r: 1, g: 0, b: 0),
+        "orange": RGB(r: 1, g: 0.45, b: 0),
+        "amber": RGB(r: 1, g: 0.65, b: 0),
+        "yellow": RGB(r: 1, g: 0.9, b: 0),
+        "lime": RGB(r: 0.6, g: 1, b: 0),
+        "green": RGB(r: 0, g: 1, b: 0),
+        "teal": RGB(r: 0, g: 1, b: 0.75),
+        "cyan": RGB(r: 0, g: 1, b: 1),
+        "sky blue": RGB(r: 0.35, g: 0.75, b: 1),
+        "blue": RGB(r: 0, g: 0.1, b: 1),
+        "purple": RGB(r: 0.55, g: 0, b: 1),
+        "violet": RGB(r: 0.7, g: 0, b: 1),
+        "magenta": RGB(r: 1, g: 0, b: 1),
+        "pink": RGB(r: 1, g: 0.35, b: 0.7),
+        "white": RGB(r: 1, g: 1, b: 1),
+        "warm white": kelvin(3200),
+        "cool white": kelvin(5600),
+    ]
+
+    /// Accepts a table name, "#RRGGBB", "<kelvin>k" ("3200k") or "<modifier> <name>" ("deep blue" → blue).
+    static func rgb(for spoken: String) -> RGB? {
+        let key = spoken.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if let hit = table[key] { return hit }
+        if key.hasPrefix("#"), key.count == 7, let value = UInt32(key.dropFirst(), radix: 16) {
+            return RGB(r: Double((value >> 16) & 0xFF) / 255,
+                       g: Double((value >> 8) & 0xFF) / 255,
+                       b: Double(value & 0xFF) / 255)
+        }
+        if key.hasSuffix("k"), let k = Double(key.dropLast()), (1000...20000).contains(k) { return kelvin(k) }
+        if let last = key.split(separator: " ").last, let hit = table[String(last)] { return hit }
+        return nil
+    }
+
+    /// Tanner Helland's black-body approximation, normalized so the max channel = 1.
+    /// Prefer a fixture's native CCT channel when it has one.
+    static func kelvin(_ k: Double) -> RGB {
+        let t = min(max(k, 1000), 40000) / 100
+        let r = t <= 66 ? 255 : 329.698727446 * pow(t - 60, -0.1332047592)
+        let g = t <= 66 ? 99.4708025861 * log(t) - 161.1195681661 : 288.1221695283 * pow(t - 60, -0.0755148492)
+        let b = t >= 66 ? 255 : (t <= 19 ? 0 : 138.5177312231 * log(t - 10) - 305.0447927307)
+        let c = [r, g, b].map { min(max($0, 0), 255) / 255 }
+        let peak = max(c[0], c[1], c[2], 0.0001)
+        return RGB(r: c[0] / peak, g: c[1] / peak, b: c[2] / peak)
+    }
+}
+```
+
+### 3.2 Guided-generation types (`LightingPlan.swift`, macOS 26+)
+
+```swift
+#if canImport(FoundationModels)
+import FoundationModels
+
+// Enums without raw values. Enum cases can't carry @Guide, so synonyms go in the type description.
+@available(macOS 26.0, *)
+@Generable(description: "Which light or group. above/overhead = top, below/floor = bottom, rim/hair/backlight = back, backdrop/wall = background, everything = all")
+enum LightTarget {
+    case key, fill, back, left, right, top, bottom, front, background, all
+}
+
+@available(macOS 26.0, *)
+@Generable(description: "What to change")
+enum LightOperation {
+    case setColor, adjustBrightness, setBrightness, turnOn, turnOff
+}
+
+// Properties are generated in declaration order: target first, then operation, then the values.
+@available(macOS 26.0, *)
+@Generable(description: "One change to one light or group")
+struct LightingAction {
+    var target: LightTarget
+    var operation: LightOperation
+
+    @Guide(description: "Lowercase color name or #RRGGBB for setColor, otherwise an empty string")
+    var color: String
+
+    @Guide(description: "adjustBrightness: change from -1 to 1 (a bit 0.15, unspecified 0.25, a lot 0.4, negative to dim). setBrightness: level from 0 to 1. Otherwise 0",
+           .range(-1.0...1.0))
+    var amount: Double
+}
+
+@available(macOS 26.0, *)
+@Generable(description: "Every lighting change requested in the sentence, in spoken order")
+struct LightingPlan {
+    @Guide(description: "One entry per light and per change", .maximumCount(12))
+    var actions: [LightingAction]
+}
+
+// Exhaustive switches: adding a case on either side becomes a compile error, not a silent mismatch.
+@available(macOS 26.0, *)
+extension LightTarget {
+    var domain: LightTargetID {
+        switch self {
+        case .key: return .key
+        case .fill: return .fill
+        case .back: return .back
+        case .left: return .left
+        case .right: return .right
+        case .top: return .top
+        case .bottom: return .bottom
+        case .front: return .front
+        case .background: return .background
+        case .all: return .all
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+extension LightOperation {
+    var domain: LightOperationID {
+        switch self {
+        case .setColor: return .setColor
+        case .adjustBrightness: return .adjustBrightness
+        case .setBrightness: return .setBrightness
+        case .turnOn: return .turnOn
+        case .turnOff: return .turnOff
+        }
+    }
+}
+
+@available(macOS 26.0, *)
+extension LightingCommandList {
+    init(_ plan: LightingPlan) {
+        self.init(actions: plan.actions.map {
+            LightingCommand(target: $0.target.domain, operation: $0.operation.domain,
+                            color: $0.color, amount: $0.amount)
+        })
+    }
+}
+#endif
+```
+
+> [!NOTE]
+> `@Guide(..., .maximumCount(12))` type-checks even though `T` can't be inferred at the attribute. The SDK ships a hidden `GenerationGuide<[Never]>` overload for exactly this case, and `@Generable` re-emits the guide with the real array type.
+
+### 3.3 `OnDeviceLightingInterpreter`
+
+```swift
+import Foundation   // FoundationModels does `public import Foundation`, not `@_exported`: import it yourself for Locale etc.
+#if canImport(FoundationModels)
+import FoundationModels
+
+@available(macOS 26.0, *)
+@MainActor
+final class OnDeviceLightingInterpreter {
+    enum Outcome: Sendable {
+        case plan(LightingCommandList)
+        /// The model can't be used right now (show the reason once, then use the fallback).
+        case unavailable(reason: String)
+        /// This utterance failed; the cloud or rule parser may still succeed.
+        case failed(reason: String)
+    }
+
+    private let model = SystemLanguageModel.default
+    private let tools: [any Tool]
+    private var warmSession: LanguageModelSession?
+
+    init(tools: [any Tool] = []) {
+        self.tools = tools
+    }
+
+    /// nil when usable, otherwise a user-facing explanation. Cheap: re-check before every use.
+    var unavailableReason: String? {
+        switch model.availability {
+        case .available:
+            return model.supportsLocale(Locale.current) ? nil : "Apple Intelligence doesn't support the current language."
+        case .unavailable(.deviceNotEligible):
+            return "This Mac doesn't support Apple Intelligence."
+        case .unavailable(.appleIntelligenceNotEnabled):
+            return "Turn on Apple Intelligence in System Settings to use on-device commands."
+        case .unavailable(.modelNotReady):
+            return "The Apple Intelligence model is still downloading."
+        case .unavailable:
+            return "Apple Intelligence is unavailable."   // future UnavailableReason cases
+        }
+    }
+
+    /// Call when the wake word is heard, so the model loads while the user is still talking.
+    func prepare() {
+        guard warmSession == nil, unavailableReason == nil else { return }
+        let session = makeSession()
+        session.prewarm()
+        warmSession = session
+    }
+
+    func interpret(_ utterance: String) async -> Outcome {
+        if let reason = unavailableReason { return .unavailable(reason: reason) }
+        // A fresh session per utterance keeps the 4,096-token window empty and rules out .concurrentRequests.
+        let session = warmSession ?? makeSession()
+        warmSession = nil
+        do {
+            let response = try await session.respond(
+                to: Self.normalize(utterance),
+                generating: LightingPlan.self,
+                options: GenerationOptions(sampling: .greedy, maximumResponseTokens: 512))
+            return .plan(LightingCommandList(response.content).sanitized())
+        } catch let error as LanguageModelSession.GenerationError {
+            return Self.outcome(for: error)
+        } catch let error as LanguageModelSession.ToolCallError {
+            return .failed(reason: "Tool \(error.tool.name) failed: \(error.underlyingError.localizedDescription)")
+        } catch {
+            return .failed(reason: error.localizedDescription)
+        }
+    }
+
+    private func makeSession() -> LanguageModelSession {
+        LanguageModelSession(model: model, tools: tools, instructions: Self.instructions)
+    }
+
+    private static func outcome(for error: LanguageModelSession.GenerationError) -> Outcome {
+        switch error {
+        case .assetsUnavailable:
+            return .unavailable(reason: "Apple Intelligence assets aren't available right now.")
+        case .unsupportedLanguageOrLocale:
+            return .unavailable(reason: "The on-device model doesn't support this language.")
+        case .guardrailViolation, .refusal:
+            return .failed(reason: "The on-device model declined this phrasing.")
+        case .exceededContextWindowSize:
+            return .failed(reason: "The command is too long for the on-device model.")
+        case .decodingFailure, .unsupportedGuide:
+            return .failed(reason: "The on-device model produced an invalid plan.")
+        case .rateLimited, .concurrentRequests:
+            return .failed(reason: "The on-device model is busy.")
+        @unknown default:
+            return .failed(reason: error.localizedDescription)
+        }
+    }
+
+    /// ⚠️ Precaution: reword stage jargon that might trip the safety guardrails.
+    nonisolated static func normalize(_ utterance: String) -> String {
+        var text = utterance
+        for (from, to) in [("kill", "turn off"), ("black out", "turn off"), ("blackout", "turn off everything")] {
+            text = text.replacingOccurrences(of: "\\b\(from)\\b", with: to,
+                                             options: [.regularExpression, .caseInsensitive])
+        }
+        return text
+    }
+
+    // Static developer text only; never interpolate user input into instructions.
+    static let instructions = """
+        You turn a spoken studio-lighting request into lighting actions.
+        Positions: key, fill, back, left, right, top, bottom, front, background, all.
+        Synonyms: above/overhead = top; below/floor = bottom; rim/hair/backlight = back; \
+        backdrop/wall/cyc = background; everything/all lights = all.
+        Rules:
+        - One action per light per change, in spoken order.
+        - setColor: color is a lowercase color name or #RRGGBB; amount 0.
+        - adjustBrightness: brighter/up is positive, dimmer/down is negative; a bit/slightly 0.15, \
+        unspecified 0.25, a lot 0.4; color "".
+        - setBrightness: absolute level, for example half 0.5, full 1, 50 percent 0.5; color "".
+        - turnOn / turnOff: color "", amount 0.
+        - Only include lights the user named. Never add extra actions.
+        Example: "red key, dim the fill a lot" -> key setColor "red" 0; fill adjustBrightness "" -0.4
+        """
+}
+#endif
+```
+
+Expected result for *"teal on the left, blue on the right, pink above, brighten the key a bit"*. This is the intended mapping; it hasn't been run on a device, so verify on an Apple-silicon Mac.
+
+```json
+{"actions": [
+  {"target": "left",  "operation": "setColor",         "color": "teal", "amount": 0},
+  {"target": "right", "operation": "setColor",         "color": "blue", "amount": 0},
+  {"target": "top",   "operation": "setColor",         "color": "pink", "amount": 0},
+  {"target": "key",   "operation": "adjustBrightness", "color": "",     "amount": 0.15}
+]}
+```
+
+### 3.4 Optional tool: let the model read the current rig state
+
+Only attach tools when a request needs live data, such as "make the right match the left" or "swap left and right". Each tool adds its schema to the instructions, which costs tokens. Each tool call is also an extra model round trip.
+
+```swift
+#if canImport(FoundationModels)
+import FoundationModels
+
+@available(macOS 26.0, *)
+struct LightStateTool: Tool {
+    let name = "getLightState"
+    let description = "Returns the current color and brightness at a position. Use it only when the request depends on the current state, such as match, swap or same as."
+
+    @Generable
+    struct Arguments {
+        @Guide(description: "The position to look up")
+        var position: LightTarget
+    }
+
+    /// Supplied by the app. Called off the main actor, so it must be thread-safe (e.g. read a locked snapshot).
+    let describe: @Sendable (LightTargetID) -> String
+
+    // The requirement is `@concurrent`. A plain nonisolated async witness is equivalent in Swift 5 mode.
+    // If the target enables NonisolatedNonsendingByDefault or MainActor default isolation, write `@concurrent` here.
+    func call(arguments: Arguments) async throws -> String {
+        describe(arguments.position.domain)    // e.g. "left: teal at 60%"
+    }
+}
+
+// Usage:
+// let interpreter = OnDeviceLightingInterpreter(tools: [LightStateTool(describe: { rig.snapshotDescription(for: $0) })])
+#endif
+```
+
+### 3.5 Calling it from the macOS 14 app: fallback chain plus a rule parser
+
+```swift
+import Foundation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
+@MainActor
+final class LightingCommandInterpreter {
+    enum Source: String, Sendable { case onDevice, cloud, rules }
+
+    var cloud: CloudLightingInterpreter?       // §4.2; nil when the user hasn't set up a key
+    var preferOnDevice = true
+    private var onDevice: AnyObject?           // OnDeviceLightingInterpreter. Stored properties can't be @available-gated
+
+    func wakeWordHeard() {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, *) { onDeviceInterpreter()?.prepare() }
+        #endif
+    }
+
+    func interpret(_ utterance: String) async -> (plan: LightingCommandList, source: Source)? {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, *), preferOnDevice, let interpreter = onDeviceInterpreter() {
+            if case .plan(let plan) = await interpreter.interpret(utterance), !plan.actions.isEmpty {
+                return (plan, .onDevice)
+            }
+        }
+        #endif
+        if let cloud, let plan = try? await cloud.interpret(utterance), !plan.actions.isEmpty {
+            return (plan, .cloud)
+        }
+        let plan = RuleBasedLightingParser.parse(utterance)
+        return plan.actions.isEmpty ? nil : (plan, .rules)
+    }
+
+    #if canImport(FoundationModels)
+    @available(macOS 26.0, *)
+    private func onDeviceInterpreter() -> OnDeviceLightingInterpreter? {
+        if let existing = onDevice as? OnDeviceLightingInterpreter { return existing }
+        let created = OnDeviceLightingInterpreter()
+        guard created.unavailableReason == nil else { return nil }   // re-checked next time (e.g. model finished downloading)
+        onDevice = created
+        return created
+    }
+    #endif
+}
+
+/// Last resort with no model and no network. Handles "<color> on the <position>", "<position> <color>",
+/// "brighten/dim the <position> (a bit | a lot)", "<position> to 50 percent" and "<position> on/off".
+enum RuleBasedLightingParser {
+    static let targetWords: [String: LightTargetID] = [
+        "key": .key, "fill": .fill, "back": .back, "backlight": .back, "rim": .back, "hair": .back,
+        "left": .left, "right": .right, "top": .top, "above": .top, "overhead": .top,
+        "bottom": .bottom, "below": .bottom, "floor": .bottom, "front": .front,
+        "background": .background, "backdrop": .background, "wall": .background,
+        "all": .all, "everything": .all,
+    ]
+
+    static func parse(_ text: String) -> LightingCommandList {
+        var actions: [LightingCommand] = []
+        let clauses = text.lowercased()
+            .replacingOccurrences(of: " and ", with: ",")
+            .split(whereSeparator: { ",;.!?".contains($0) })
+        for clause in clauses {
+            let words = clause.split(whereSeparator: { !($0.isLetter || $0.isNumber || $0 == "#") }).map(String.init)
+            guard let target = words.lazy.compactMap({ targetWords[$0] }).first else { continue }
+            let has = { (candidates: [String]) -> Bool in words.contains { candidates.contains($0) } }
+            let step = has(["bit", "slightly", "little", "touch"]) ? 0.15 : has(["lot", "much", "way"]) ? 0.4 : 0.25
+
+            if has(["off", "kill", "blackout"]) {
+                actions.append(LightingCommand(target: target, operation: .turnOff, color: "", amount: 0))
+            } else if words.last == "on" || clause.contains("turn on") || clause.contains("switch on") {
+                actions.append(LightingCommand(target: target, operation: .turnOn, color: "", amount: 0))
+            } else if let color = colorName(in: words) {
+                actions.append(LightingCommand(target: target, operation: .setColor, color: color, amount: 0))
+            } else if clause.contains("%") || has(["percent"]), let value = words.lazy.compactMap({ Double($0) }).first {
+                actions.append(LightingCommand(target: target, operation: .setBrightness, color: "", amount: value / 100))
+            } else if has(["brighten", "brighter", "up", "raise", "increase", "more"]) {
+                actions.append(LightingCommand(target: target, operation: .adjustBrightness, color: "", amount: step))
+            } else if has(["dim", "dimmer", "darker", "down", "lower", "decrease", "less"]) {
+                actions.append(LightingCommand(target: target, operation: .adjustBrightness, color: "", amount: -step))
+            }
+        }
+        return LightingCommandList(actions: actions).sanitized()
+    }
+
+    private static func colorName(in words: [String]) -> String? {
+        for (first, second) in zip(words, words.dropFirst()) where ColorNameResolver.table["\(first) \(second)"] != nil {
+            return "\(first) \(second)"
+        }
+        return words.first { ColorNameResolver.table[$0] != nil || ($0.hasPrefix("#") && $0.count == 7) }
+    }
+}
+```
+
+The sample sentence also parses with the rule parser: left teal, right blue, top pink, key +0.15.
+
+### 3.6 Notes and pitfalls
+
+- **Testing.** CI can't exercise the model because runner VMs report `.deviceNotEligible`. Unit-test `LightingCommandList.init(_:)`, `sanitized()`, `ColorNameResolver` and `RuleBasedLightingParser`. Try generation by hand on an Apple-silicon Mac with Apple Intelligence on.
+- **Latency.**
+  - Call `prepare()` on the wake word.
+  - Use `.greedy` sampling (deterministic) and keep the instructions short.
+  - Skip tools unless needed.
+  - ⚠️ A four-action plan should take roughly 0.5–2 s on M-series. This is an estimate, not a measurement.
+- **Context budget.** Instructions (~250 tokens) + schema + prompt + output (~150 tokens) is well under 4,096.
+  - Reusing one session for follow-ups ("a bit more") grows the transcript until `.exceededContextWindowSize`. Then start a new session, optionally seeded with a trimmed transcript via `LanguageModelSession(model:tools:transcript:)`.
+  - Simpler: let the app handle "more/again" by repeating the last plan.
+  - `tokenCount(for:)` is available from macOS 26.4 (`if #available(macOS 26.4, *)`).
+- **Guardrails.** `.guardrailViolation` / `.refusal` can fire on harmless phrasing; fall back rather than retrying. ⚠️ `SystemLanguageModel(guardrails: .permissiveContentTransformations)` is aimed at string-transformation tasks; don't count on it for guided generation. `useCase: .contentTagging` is for tagging/extraction; `.general` (the default) is right here.
+- **Schema in the prompt.** `includeSchemaInPrompt: true` (the default) helps a small model. With a reused session and an example in the instructions you can pass `false` on later turns to save tokens.
+- **Streaming (optional).**
+  - `session.streamResponse(to:generating:options:)` returns a `ResponseStream<LightingPlan>`, an `AsyncSequence` of `Snapshot`.
+  - Each snapshot's `.content` is a `LightingPlan.PartiallyGenerated` with optional properties.
+  - You could apply each action as soon as it's complete; for 12 actions or fewer it isn't worth it.
+- **Linking and macros.** FoundationModels must be weak-linked to launch on macOS 14/15, and `@Generable` needs Xcode's macro plugin. Both are covered in §0.3 (items 4 and 5).
+- **Language.** `supportsLocale()` checks `Locale.current`. Pass the speech recognizer's locale instead if it can differ.
+
+---
+
+## 4. Cloud LLM fallback (OpenAI, Anthropic, Gemini)
+
+Use the cloud when on-device isn't available (macOS 14/15, Intel, Apple Intelligence off), when it refuses, and for camera-frame verification, which the on-device model can't do (it takes text only). Plain `URLSession` + `JSONSerialization` works; no SDKs are needed. The app isn't sandboxed, so no network entitlement is required.
+
+### 4.1 One schema for all three providers
+
+Constraints that shape the schema:
+- **OpenAI strict mode.** Every property must be in `required` and every object needs `additionalProperties: false`.
+- **Anthropic strict mode.** No `minimum`/`maximum`/`minLength`/`maxLength`, and no `minItems` above 1.
+- **Gemini `responseJsonSchema`.** Accepts standard JSON Schema, including `additionalProperties`.
+
+So the schema has no numeric bounds, and `sanitized()` (§3.1) clamps on the client.
+
+```swift
+// LightingSchema.swift
+import Foundation
+
+/// Built in small typed pieces: nested heterogeneous literals without annotations fail to type-check
+/// ("heterogeneous collection literal could only be inferred to '[String : Any]'") or compile slowly.
+enum LightingSchema {
+    static var action: [String: Any] {
+        let target: [String: Any] = [
+            "type": "string",
+            "enum": LightTargetID.allCases.map(\.rawValue),
+            "description": "Light or group. above/overhead = top, below/floor = bottom, rim/hair/backlight = back, backdrop/wall = background, everything = all",
+        ]
+        let operation: [String: Any] = [
+            "type": "string",
+            "enum": LightOperationID.allCases.map(\.rawValue),
+        ]
+        let color: [String: Any] = [
+            "type": "string",
+            "description": "Lowercase color name or #RRGGBB for setColor, otherwise an empty string",
+        ]
+        let amount: [String: Any] = [
+            "type": "number",
+            "description": "adjustBrightness: change from -1 to 1 (a bit 0.15, unspecified 0.25, a lot 0.4, negative to dim). setBrightness: level from 0 to 1. Otherwise 0",
+        ]
+        return [
+            "type": "object",
+            "properties": ["target": target, "operation": operation, "color": color, "amount": amount],
+            "required": ["target", "operation", "color", "amount"],
+            "additionalProperties": false,
+        ]
+    }
+
+    static var plan: [String: Any] {
+        let actions: [String: Any] = ["type": "array", "items": action]
+        return [
+            "type": "object",
+            "properties": ["actions": actions],
+            "required": ["actions"],
+            "additionalProperties": false,
+        ]
+    }
+
+    static var verification: [String: Any] {
+        let matches: [String: Any] = ["type": "boolean", "description": "true if the photo matches the request closely enough"]
+        let issues: [String: Any] = ["type": "array", "items": ["type": "string"]]
+        let adjustments: [String: Any] = ["type": "array", "items": action]
+        return [
+            "type": "object",
+            "properties": ["matchesIntent": matches, "issues": issues, "adjustments": adjustments],
+            "required": ["matchesIntent", "issues", "adjustments"],
+            "additionalProperties": false,
+        ]
+    }
+}
+
+enum OutputSchema: Sendable {
+    case plan, verification
+
+    var name: String { self == .plan ? "lighting_plan" : "lighting_check" }
+    var json: [String: Any] { self == .plan ? LightingSchema.plan : LightingSchema.verification }
+}
+
+struct LightingVerification: Codable, Sendable {
+    var matchesIntent: Bool
+    var issues: [String]
+    var adjustments: [LightingCommand]
+}
+
+enum LightingPrompts {
+    static let interpret = """
+        You convert a spoken studio-lighting request into lighting actions. \
+        Use one action per light per change, in spoken order, and only for lights the user named. \
+        Use an empty color string and amount 0 where they don't apply.
+        """
+
+    static let verify = """
+        You check a webcam photo of a small studio against the lighting that was requested. \
+        Judge only light color and relative brightness on the subject and background, not composition. \
+        The camera's automatic white balance may neutralize colors, so compare hues between the sides \
+        rather than absolute colors. If the result is close enough, set matchesIntent to true with no \
+        adjustments. Otherwise list the issues briefly and propose corrective actions.
+        """
+}
+```
+
+### 4.2 Requests and response parsing
+
+| | OpenAI Responses API | Anthropic Messages API | Gemini `generateContent` |
+|---|---|---|---|
+| Endpoint | `POST https://api.openai.com/v1/responses` | `POST https://api.anthropic.com/v1/messages` | `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` |
+| Auth | `Authorization: Bearer KEY` | `x-api-key: KEY` + `anthropic-version: 2026-10-21` | `x-goog-api-key: KEY` |
+| Structured output | `text.format = {type: "json_schema", name, strict: true, schema}` | `output_config.format = {type: "json_schema", schema}` (or a strict tool) | `generationConfig.responseMimeType = "application/json"` + `responseJsonSchema` |
+| Image | `{type: "input_image", image_url: "data:image/jpeg;base64,…", detail: "low"}` | `{type: "image", source: {type: "base64", media_type: "image/jpeg", data}}` | `{inline_data: {mime_type: "image/jpeg", data}}` part |
+| Answer | `output[]` → `type == "message"` → `content[]` → `type == "output_text"` → `text` | `content[]` → `type == "text"` → `text` (or `tool_use` → `input`) | `candidates[0].content.parts[].text`, skipping parts with `thought: true` |
+| Failure signals | `status == "incomplete"` (+ `incomplete_details.reason`); a `refusal` content part | `stop_reason` `"refusal"` / `"max_tokens"` | `promptFeedback.blockReason`; `finishReason` other than `STOP` |
+
+```swift
+// CloudLightingInterpreter.swift
+import Foundation
+
+enum CloudProvider: String, Codable, CaseIterable, Sendable {
+    case openAI, anthropic, gemini
+}
+
+enum CloudLLMError: Error, LocalizedError {
+    case badURL
+    case http(status: Int, body: String)
+    case malformedResponse(String)
+    case refused(String)
+    case truncated(String)
+    case blocked(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .badURL: return "Invalid endpoint URL."
+        case .http(let status, let body): return "HTTP \(status): \(body)"
+        case .malformedResponse(let detail): return "Unexpected response: \(detail)"
+        case .refused(let detail): return "The model refused: \(detail)"
+        case .truncated(let detail): return "The response was cut off (\(detail))."
+        case .blocked(let detail): return "Blocked by the provider (\(detail))."
+        }
+    }
+}
+
+extension URLSession {
+    /// Short timeouts suit voice commands; nothing is cached or stored on disk.
+    static let llm: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 15
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+}
+
+struct CloudLightingInterpreter: Sendable {
+    var provider: CloudProvider
+    var model: String                      // see §4.5
+    var apiKey: String                     // from APIKeyStore (§4.4)
+    /// OpenAI only. "none" works on gpt-6.1-terra, gpt-6-sol and gpt-6-luna; gpt-6-astra and gpt-6.1-sol need "low".
+    var openAIReasoningEffort = "none"
+    var session: URLSession = .llm
+
+    func interpret(_ utterance: String) async throws -> LightingCommandList {
+        let json = try await structuredJSON(system: LightingPrompts.interpret, user: utterance,
+                                            imageJPEG: nil, schema: .plan)
+        return try JSONDecoder().decode(LightingCommandList.self, from: json).sanitized()
+    }
+
+    /// Sends a camera frame plus the request and the applied actions; returns a verdict and corrections.
+    func verify(utterance: String, applied: LightingCommandList, frameJPEG: Data) async throws -> LightingVerification {
+        let appliedJSON = String(decoding: try JSONEncoder().encode(applied), as: UTF8.self)
+        let user = """
+            Requested: "\(utterance)"
+            Applied actions: \(appliedJSON)
+            Does the photo match the request?
+            """
+        let json = try await structuredJSON(system: LightingPrompts.verify, user: user,
+                                            imageJPEG: frameJPEG, schema: .verification)
+        var result = try JSONDecoder().decode(LightingVerification.self, from: json)
+        result.adjustments = LightingCommandList(actions: result.adjustments).sanitized().actions
+        return result
+    }
+
+    /// Returns the UTF-8 bytes of the JSON object that matches `schema`.
+    func structuredJSON(system: String, user: String, imageJPEG: Data?, schema: OutputSchema) async throws -> Data {
+        let request: URLRequest
+        switch provider {
+        case .openAI: request = try openAIRequest(system: system, user: user, imageJPEG: imageJPEG, schema: schema)
+        case .anthropic: request = try anthropicRequest(system: system, user: user, imageJPEG: imageJPEG, schema: schema)
+        case .gemini: request = try geminiRequest(system: system, user: user, imageJPEG: imageJPEG, schema: schema)
+        }
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+        guard (200..<300).contains(status) else {
+            // 400 = bad body or schema, 401/403 = key, 429 = rate limit or quota, 5xx/529 = overloaded (retry later).
+            throw CloudLLMError.http(status: status, body: String(decoding: data.prefix(4096), as: UTF8.self))
+        }
+        let root = try Self.jsonObject(data)
+        switch provider {
+        case .openAI: return try Self.openAIPayload(root)
+        case .anthropic: return try Self.anthropicPayload(root)
+        case .gemini: return try Self.geminiPayload(root)
+        }
+    }
+}
+
+// MARK: - Request builders
+
+extension CloudLightingInterpreter {
+    func openAIRequest(system: String, user: String, imageJPEG: Data?, schema: OutputSchema) throws -> URLRequest {
+        var content: [[String: Any]] = [["type": "input_text", "text": user]]
+        if let imageJPEG {
+            content.append([
+                "type": "input_image",
+                "image_url": "data:image/jpeg;base64," + imageJPEG.base64EncodedString(),
+                "detail": "low",             // cheap and enough for a color check; "high" for fine detail
+            ])
+        }
+        let message: [String: Any] = ["role": "user", "content": content]
+        let format: [String: Any] = ["type": "json_schema", "name": schema.name, "strict": true, "schema": schema.json]
+        let body: [String: Any] = [
+            "model": model,
+            "instructions": system,
+            "input": [message],
+            "text": ["format": format],
+            "reasoning": ["effort": openAIReasoningEffort],
+            "max_output_tokens": 2048,       // includes reasoning tokens when effort isn't "none"
+            "store": false,
+            // No temperature / top_p unless effort is "none".
+        ]
+        return try Self.post("https://api.openai.com/v1/responses",
+                             headers: ["Authorization": "Bearer \(apiKey)"], body: body)
+    }
+
+    func anthropicRequest(system: String, user: String, imageJPEG: Data?, schema: OutputSchema) throws -> URLRequest {
+        var content: [[String: Any]] = []
+        if let imageJPEG {
+            let source: [String: Any] = ["type": "base64", "media_type": "image/jpeg",
+                                         "data": imageJPEG.base64EncodedString()]
+            content.append(["type": "image", "source": source])    // image first, then the question
+        }
+        content.append(["type": "text", "text": user])
+        let message: [String: Any] = ["role": "user", "content": content]
+        let format: [String: Any] = ["type": "json_schema", "schema": schema.json]
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 1024,
+            "system": system,
+            "messages": [message],
+            "output_config": ["format": format],
+            // No temperature / top_p / top_k: anthropic-version 2026-10-21 rejects them.
+        ]
+        return try Self.post("https://api.anthropic.com/v1/messages",
+                             headers: ["x-api-key": apiKey, "anthropic-version": "2026-10-21"], body: body)
+    }
+
+    func geminiRequest(system: String, user: String, imageJPEG: Data?, schema: OutputSchema) throws -> URLRequest {
+        var parts: [[String: Any]] = [["text": user]]
+        if let imageJPEG {
+            let inline: [String: Any] = ["mime_type": "image/jpeg", "data": imageJPEG.base64EncodedString()]
+            parts.append(["inline_data": inline])
+        }
+        let content: [String: Any] = ["role": "user", "parts": parts]
+        let generationConfig: [String: Any] = [
+            "responseMimeType": "application/json",
+            "responseJsonSchema": schema.json,
+            // No maxOutputTokens: on thinking models it also caps thinking and can produce an empty MAX_TOKENS answer.
+        ]
+        let body: [String: Any] = [
+            "systemInstruction": ["parts": [["text": system]]],
+            "contents": [content],
+            "generationConfig": generationConfig,
+        ]
+        return try Self.post("https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent",
+                             headers: ["x-goog-api-key": apiKey], body: body)
+    }
+
+    static func post(_ endpoint: String, headers: [String: String], body: [String: Any]) throws -> URLRequest {
+        guard let url = URL(string: endpoint) else { throw CloudLLMError.badURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
+}
+
+// MARK: - Response parsing
+
+extension CloudLightingInterpreter {
+    static func jsonObject(_ data: Data) throws -> [String: Any] {
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw CloudLLMError.malformedResponse("top level is not a JSON object")
+        }
+        return object
+    }
+
+    static func openAIPayload(_ root: [String: Any]) throws -> Data {
+        if (root["status"] as? String) == "incomplete" {
+            let reason = (root["incomplete_details"] as? [String: Any])?["reason"] as? String
+            throw CloudLLMError.truncated(reason ?? "incomplete")       // e.g. "max_output_tokens"
+        }
+        for item in root["output"] as? [[String: Any]] ?? [] where (item["type"] as? String) == "message" {
+            for part in item["content"] as? [[String: Any]] ?? [] {
+                switch part["type"] as? String ?? "" {
+                case "output_text":
+                    if let text = part["text"] as? String { return Data(text.utf8) }
+                case "refusal":
+                    throw CloudLLMError.refused(part["refusal"] as? String ?? "")
+                default:
+                    continue
+                }
+            }
+        }
+        throw CloudLLMError.malformedResponse("no output_text in output[]")   // reasoning items are skipped
+    }
+
+    static func anthropicPayload(_ root: [String: Any]) throws -> Data {
+        switch root["stop_reason"] as? String ?? "" {
+        case "refusal": throw CloudLLMError.refused("stop_reason refusal")
+        case "max_tokens": throw CloudLLMError.truncated("max_tokens")
+        default: break
+        }
+        let blocks = root["content"] as? [[String: Any]] ?? []
+        // Tool-use variant (§4.3): the tool's input object is the payload.
+        if let input = blocks.first(where: { ($0["type"] as? String) == "tool_use" })?["input"] {
+            return try JSONSerialization.data(withJSONObject: input)
+        }
+        let text = blocks.filter { ($0["type"] as? String) == "text" }
+            .compactMap { $0["text"] as? String }
+            .joined()
+        guard !text.isEmpty else { throw CloudLLMError.malformedResponse("no text block") }
+        return Data(text.utf8)
+    }
+
+    static func geminiPayload(_ root: [String: Any]) throws -> Data {
+        if let reason = (root["promptFeedback"] as? [String: Any])?["blockReason"] as? String {
+            throw CloudLLMError.blocked(reason)
+        }
+        guard let candidate = (root["candidates"] as? [[String: Any]])?.first else {
+            throw CloudLLMError.malformedResponse("no candidates")
+        }
+        let finish = candidate["finishReason"] as? String ?? "STOP"
+        if finish == "MAX_TOKENS" { throw CloudLLMError.truncated(finish) }
+        if finish != "STOP" { throw CloudLLMError.blocked(finish) }        // SAFETY, RECITATION, …
+        let parts = (candidate["content"] as? [String: Any])?["parts"] as? [[String: Any]] ?? []
+        let text = parts.filter { ($0["thought"] as? Bool) != true }
+            .compactMap { $0["text"] as? String }
+            .joined()
+        guard !text.isEmpty else { throw CloudLLMError.malformedResponse("no text part") }
+        return Data(text.utf8)
+    }
+}
+```
+
+### 4.3 Variants: OpenAI Chat Completions and Anthropic tool use
+
+```swift
+extension CloudLightingInterpreter {
+    /// OpenAI Chat Completions variant (POST /v1/chat/completions). Parse choices[0].message.content
+    /// (a JSON string). choices[0].message.refusal is non-null on refusal; finish_reason "length" means truncated.
+    func openAIChatRequest(system: String, user: String, imageJPEG: Data?, schema: OutputSchema) throws -> URLRequest {
+        var userContent: [[String: Any]] = [["type": "text", "text": user]]
+        if let imageJPEG {
+            let imageURL: [String: Any] = ["url": "data:image/jpeg;base64," + imageJPEG.base64EncodedString(),
+                                           "detail": "low"]
+            userContent.append(["type": "image_url", "image_url": imageURL])
+        }
+        let messages: [[String: Any]] = [
+            ["role": "system", "content": system],
+            ["role": "user", "content": userContent],
+        ]
+        let jsonSchema: [String: Any] = ["name": schema.name, "strict": true, "schema": schema.json]
+        let responseFormat: [String: Any] = ["type": "json_schema", "json_schema": jsonSchema]
+        let body: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "response_format": responseFormat,
+            "reasoning_effort": openAIReasoningEffort,
+            "max_completion_tokens": 2048,
+        ]
+        return try Self.post("https://api.openai.com/v1/chat/completions",
+                             headers: ["Authorization": "Bearer \(apiKey)"], body: body)
+    }
+
+    /// Anthropic tool-use variant, parsed by `anthropicPayload` (tool_use branch).
+    /// Keep tool_choice "auto": forcing ("any" / "tool") returns 400 on Opus 5.5, Sonnet 5.5 and Fable 5.1.
+    /// Haiku 5.5 still allows forcing. Prefer output_config (§4.2) unless you already use tools.
+    func anthropicToolRequest(system: String, user: String) throws -> URLRequest {
+        let tool: [String: Any] = [
+            "name": "apply_lighting",
+            "description": "Apply these lighting actions in the studio.",
+            "strict": true,
+            "input_schema": LightingSchema.plan,
+        ]
+        let message: [String: Any] = ["role": "user", "content": user]
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 1024,
+            "system": system + " Always answer by calling apply_lighting.",
+            "messages": [message],
+            "tools": [tool],
+            "tool_choice": ["type": "auto"],
+        ]
+        return try Self.post("https://api.anthropic.com/v1/messages",
+                             headers: ["x-api-key": apiKey, "anthropic-version": "2026-10-21"], body: body)
+    }
+}
+```
+
+### 4.4 Camera frame → JPEG, verification loop, API-key storage
+
+```swift
+// FrameEncoder.swift
+import CoreImage
+import CoreVideo
+import Foundation
+import ImageIO
+
+enum FrameEncoder {
+    /// CIContext is thread-safe; one shared instance avoids per-frame setup cost.
+    nonisolated(unsafe) static let context = CIContext(options: [.cacheIntermediates: false])
+
+    /// BGRA camera frame → sRGB JPEG, longest side ≤ maxDimension (1024 is plenty for color checks).
+    static func jpeg(from pixelBuffer: CVPixelBuffer, maxDimension: CGFloat = 1024, quality: CGFloat = 0.7) -> Data? {
+        var image = CIImage(cvPixelBuffer: pixelBuffer)
+        let longest = max(image.extent.width, image.extent.height)
+        if longest > maxDimension {
+            let scale = maxDimension / longest
+            image = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        }
+        let options: [CIImageRepresentationOption: Any] = [
+            CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String): quality
+        ]
+        let sRGB = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        return context.jpegRepresentation(of: image, colorSpace: sRGB, options: options)
+    }
+}
+```
+
+Verification loop:
+1. Apply the plan.
+2. Wait about 0.5 s for fixture fades and the camera's auto exposure and white balance to settle. Or lock them first (§5.4).
+3. Take the latest frame, encode it with `FrameEncoder.jpeg`, and call `verify(utterance:applied:frameJPEG:)`.
+4. If `matchesIntent` is false, apply `adjustments` **once** and show `issues`. Never loop more than 1–2 rounds, because the camera's auto white balance can make the model chase its tail.
+5. Make camera upload an explicit opt-in. Frames show people and rooms. OpenAI gets `store: false`; Anthropic and Gemini retention follows each account's settings.
+
+```swift
+// APIKeyStore.swift: legacy (file-based) login keychain.
+// The data-protection keychain (kSecUseDataProtectionKeychain) fails with errSecMissingEntitlement (-34018)
+// without signing entitlements. With ad-hoc signing, each rebuild changes the code identity, so macOS asks
+// "Prism wants to use … keychain" again. Signing with a stable self-signed certificate (§0.3) avoids that.
+import Foundation
+import Security
+
+enum APIKeyStore {
+    static let service = "Prism.CloudLLM"          // use the bundle identifier
+
+    struct KeychainError: Error { let status: OSStatus }
+
+    static func save(_ key: String, account: CloudProvider) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account.rawValue,
+        ]
+        SecItemDelete(query as CFDictionary)
+        var attributes = query
+        attributes[kSecValueData as String] = Data(key.utf8)
+        let status = SecItemAdd(attributes as CFDictionary, nil)
+        guard status == errSecSuccess else { throw KeychainError(status: status) }
+    }
+
+    static func load(account: CloudProvider) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account.rawValue,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    static func delete(account: CloudProvider) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account.rawValue,
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+}
+```
+
+### 4.5 Model names (from provider docs, November 2026; re-check before shipping)
+
+| Provider | Voice → JSON (fast/cheap) | Camera verification (vision) | Flagship | Notes |
+|---|---|---|---|---|
+| OpenAI | `gpt-6.1-terra` (effort `none`) or `gpt-6-luna` (cheapest) | `gpt-6.1-terra` | `gpt-6-astra` | Also `gpt-6.1-sol`, `gpt-6-sol`. Effort `none` only on terra, gpt-6-sol and luna; astra and 6.1-sol need `low`. Don't send temperature/top_p unless effort is `none` |
+| Anthropic | `claude-haiku-5-5` | `claude-sonnet-5-5` | `claude-opus-5-5` | Also `claude-fable-5-1`. `anthropic-version: 2026-10-21` rejects sampling parameters. Forced `tool_choice` returns 400 on Opus 5.5, Sonnet 5.5 and Fable 5.1 |
+| Google | `gemini-3.5-flash-lite` or `gemini-3.8-flash` | `gemini-3.8-flash` | `gemini-4-argon` | `responseJsonSchema` in `generationConfig`. AI Studio introduced new "auth keys" in May 2026. The newer Interactions API (`POST /v1beta/interactions`, header `Api-Revision: 2026-05-20`) is an alternative not covered here |
+
+> [!WARNING]
+> Model IDs and parameter rules change every few months. Make `model` a user setting with these defaults. Show the provider's error body (`CloudLLMError.http`) in the UI so a retired model name is obvious.
+
+---
+
+## 5. Camera: capture, region color, preview, exposure/white-balance locking
+
+✅ Checked against the macOS 26.5 SDK headers (`AVCaptureDevice.h`, `AVCaptureSession.h`, `AVCaptureVideoDataOutput.h`, `AVCaptureVideoPreviewLayer.h`) and Apple's "Supporting Continuity Camera in your macOS app" sample.
+
+### 5.1 `CameraManager`
+
+```swift
+// CameraManager.swift
+import AVFoundation
+import CoreMedia
+import CoreVideo
+
+/// Owns the capture session. Graph changes and start/stop run on `sessionQueue` (startRunning() blocks);
+/// frames arrive on `frameQueue`.
+final class CameraManager: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+    typealias FrameHandler = @Sendable (CVPixelBuffer, CMTime) -> Void
+
+    enum CameraError: Error { case notAuthorized, noCamera, cannotAddInput, cannotAddOutput }
+
+    let session = AVCaptureSession()
+    private let sessionQueue = DispatchQueue(label: "prism.camera.session")
+    private let frameQueue = DispatchQueue(label: "prism.camera.frames", qos: .userInitiated)
+    private let output = AVCaptureVideoDataOutput()
+    private var currentInput: AVCaptureDeviceInput?     // sessionQueue only
+    private var observers: [NSObjectProtocol] = []      // main thread only
+
+    private let lock = NSLock()
+    private var frameHandler: FrameHandler?             // guarded by `lock`
+
+    deinit {
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    /// Called on the frame queue for every frame. Keep it short: late frames are dropped while it runs.
+    func setFrameHandler(_ handler: FrameHandler?) {
+        lock.lock(); frameHandler = handler; lock.unlock()
+    }
+
+    /// Built-in, USB/UVC (.external, macOS 14), iPhone Continuity Camera (.continuityCamera, macOS 14) and Desk View.
+    /// Without NSCameraUseContinuityCameraDeviceType = true in Info.plist, Continuity cameras report
+    /// .builtInWideAngleCamera instead (they're still discovered).
+    static func availableCameras() -> [AVCaptureDevice] {
+        AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInWideAngleCamera, .external, .continuityCamera, .deskViewCamera],
+            mediaType: .video,
+            position: .unspecified
+        ).devices
+    }
+
+    static func requestAccess() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized: return true
+        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .video)
+        case .denied, .restricted: return false
+        @unknown default: return false
+        }
+    }
+
+    /// Selects a camera by `uniqueID` (persist it in UserDefaults) or nil for the system-preferred camera.
+    func configure(deviceUniqueID: String? = nil) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            sessionQueue.async {
+                do {
+                    try self.configureOnSessionQueue(deviceUniqueID: deviceUniqueID)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func start() {
+        sessionQueue.async { if !self.session.isRunning { self.session.startRunning() } }
+    }
+
+    func stop() {
+        sessionQueue.async { if self.session.isRunning { self.session.stopRunning() } }
+    }
+
+    /// Runs `body` with the active device on the session queue (e.g. to lock exposure, §5.4).
+    func withDevice(_ body: @escaping @Sendable (AVCaptureDevice) -> Void) {
+        sessionQueue.async { if let device = self.currentInput?.device { body(device) } }
+    }
+
+    private func configureOnSessionQueue(deviceUniqueID: String?) throws {
+        guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else { throw CameraError.notAuthorized }
+        let device = deviceUniqueID.flatMap(AVCaptureDevice.init(uniqueID:))
+            ?? AVCaptureDevice.systemPreferredCamera
+            ?? AVCaptureDevice.default(for: .video)
+        guard let device else { throw CameraError.noCamera }
+        let input = try AVCaptureDeviceInput(device: device)
+
+        session.beginConfiguration()
+        defer { session.commitConfiguration() }
+
+        if let currentInput { session.removeInput(currentInput) }
+        currentInput = nil
+        guard session.canAddInput(input) else { throw CameraError.cannotAddInput }
+        session.addInput(input)
+        currentInput = input
+
+        // 720p is plenty for color sampling and keeps CPU low. Not every webcam supports every preset.
+        if session.canSetSessionPreset(.hd1280x720) { session.sessionPreset = .hd1280x720 }
+
+        if !session.outputs.contains(output) {
+            output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+            output.alwaysDiscardsLateVideoFrames = true
+            output.setSampleBufferDelegate(self, queue: frameQueue)
+            guard session.canAddOutput(output) else { throw CameraError.cannotAddOutput }
+            session.addOutput(output)
+        }
+    }
+
+    // MARK: AVCaptureVideoDataOutputSampleBufferDelegate (frame queue)
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
+                       from connection: AVCaptureConnection) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        lock.lock(); let handler = frameHandler; lock.unlock()
+        handler?(pixelBuffer, CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+    }
+
+    // MARK: Hot-plug and errors
+
+    /// Call once from the main thread. `onCamerasChanged` should refresh the camera menu.
+    func observeDeviceChanges(onCamerasChanged: @escaping @Sendable () -> Void) {
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(forName: AVCaptureDevice.wasConnectedNotification,
+                                            object: nil, queue: .main) { _ in
+            onCamerasChanged()
+        })
+        observers.append(center.addObserver(forName: AVCaptureDevice.wasDisconnectedNotification,
+                                            object: nil, queue: .main) { [weak self] note in
+            onCamerasChanged()
+            guard let self, let uniqueID = (note.object as? AVCaptureDevice)?.uniqueID else { return }
+            self.sessionQueue.async {
+                // The active camera went away: fall back to the system-preferred one.
+                guard self.currentInput?.device.uniqueID == uniqueID else { return }
+                try? self.configureOnSessionQueue(deviceUniqueID: nil)
+            }
+        })
+        observers.append(center.addObserver(forName: AVCaptureSession.runtimeErrorNotification,
+                                            object: session, queue: nil) { [weak self] note in
+            let error = note.userInfo?[AVCaptureSessionErrorKey] as? NSError
+            NSLog("Camera runtime error: %@", error?.localizedDescription ?? "unknown")
+            self?.sessionQueue.asyncAfter(deadline: .now() + 1) { [weak self] in
+                guard let self, !self.session.isRunning else { return }
+                self.session.startRunning()
+            }
+        })
+    }
+}
+
+/// Follows AVCaptureDevice.systemPreferredCamera (macOS 13+): the camera macOS recommends, e.g. an iPhone
+/// that was just mounted for Continuity Camera. KVO on the class itself, as in Apple's sample.
+/// When the user picks a camera manually, also set `AVCaptureDevice.userPreferredCamera = device`.
+final class SystemPreferredCameraObserver: NSObject {
+    private let keyPath = "systemPreferredCamera"
+    var onChange: ((AVCaptureDevice?) -> Void)?
+
+    override init() {
+        super.init()
+        AVCaptureDevice.self.addObserver(self, forKeyPath: keyPath, options: [.new], context: nil)
+    }
+
+    deinit {
+        AVCaptureDevice.self.removeObserver(self, forKeyPath: keyPath)
+    }
+
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?,
+                               change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
+        guard keyPath == self.keyPath else {
+            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+            return
+        }
+        onChange?(change?[.newKey] as? AVCaptureDevice)    // arbitrary thread: hop to main before touching UI
+    }
+}
+```
+
+Notes:
+- **Output size.** The `videoSettings` header documents `kCVPixelBufferWidthKey` / `kCVPixelBufferHeightKey` scaling only for iOS 16+. On macOS, scale with the session preset or `activeFormat` instead (⚠️ macOS may honor the keys, but that's undocumented).
+- **Frame rate.** To cap frames, set `device.activeVideoMinFrameDuration` inside `lockForConfiguration()`. Or drop frames in the handler: color checks need 5–10 fps at most.
+
+### 5.2 Region color averaging (CPU, BGRA)
+
+```swift
+// RegionColor.swift
+import CoreVideo
+import Foundation
+
+struct LinearColor: Sendable, Equatable {
+    var r: Double
+    var g: Double
+    var b: Double
+
+    /// Brightness-independent rg chromaticity: compare hue between regions or frames while exposure drifts.
+    var chromaticity: (r: Double, g: Double) {
+        let sum = max(r + g + b, 1e-6)
+        return (r / sum, g / sum)
+    }
+
+    /// Hue in degrees (0..<360), saturation and value (0...1).
+    var hsv: (h: Double, s: Double, v: Double) {
+        let maxC = max(r, g, b), minC = min(r, g, b), delta = maxC - minC
+        var h = 0.0
+        if delta > 1e-6 {
+            if maxC == r { h = 60 * ((g - b) / delta).truncatingRemainder(dividingBy: 6) }
+            else if maxC == g { h = 60 * ((b - r) / delta + 2) }
+            else { h = 60 * ((r - g) / delta + 4) }
+        }
+        if h < 0 { h += 360 }
+        return (h, maxC > 0 ? delta / maxC : 0, maxC)
+    }
+}
+
+enum RegionColor {
+    /// sRGB transfer function decoded once: 8-bit code → linear light.
+    private static let srgbToLinear: [Double] = (0..<256).map { code in
+        let c = Double(code) / 255
+        return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+    }
+
+    /// Mean color of `region` in a 32BGRA buffer. `region` is normalized (0...1) with a TOP-LEFT origin, which
+    /// matches buffer memory order. `step` subsamples: 4 reads 1/16 of the pixels.
+    static func average(in pixelBuffer: CVPixelBuffer, region: CGRect, step: Int = 4,
+                        linearize: Bool = true) -> LinearColor? {
+        guard CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_32BGRA else { return nil }
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        let rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer)     // includes padding: never assume width * 4
+        let clipped = region.standardized.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+        guard !clipped.isNull, !clipped.isEmpty else { return nil }
+        let x0 = Int(clipped.minX * CGFloat(width)), x1 = Int(clipped.maxX * CGFloat(width))
+        let y0 = Int(clipped.minY * CGFloat(height)), y1 = Int(clipped.maxY * CGFloat(height))
+        let stepSize = max(1, step)
+
+        let pixels = base.assumingMemoryBound(to: UInt8.self)
+        var sumR = 0.0, sumG = 0.0, sumB = 0.0
+        var count = 0
+        srgbToLinear.withUnsafeBufferPointer { lut in
+            for y in stride(from: y0, to: y1, by: stepSize) {
+                let row = pixels + y * rowBytes
+                for x in stride(from: x0, to: x1, by: stepSize) {
+                    let px = row + x * 4                               // memory order: B, G, R, A
+                    if linearize {
+                        sumB += lut[Int(px[0])]; sumG += lut[Int(px[1])]; sumR += lut[Int(px[2])]
+                    } else {
+                        sumB += Double(px[0]) / 255; sumG += Double(px[1]) / 255; sumR += Double(px[2]) / 255
+                    }
+                    count += 1
+                }
+            }
+        }
+        guard count > 0 else { return nil }
+        let n = Double(count)
+        return LinearColor(r: sumR / n, g: sumG / n, b: sumB / n)
+    }
+}
+```
+
+GPU alternative for large regions (Core Image):
+
+```swift
+import CoreImage
+import CoreImage.CIFilterBuiltins
+
+extension RegionColor {
+    /// Core Image's origin is BOTTOM-LEFT, so flip the top-left normalized rect.
+    /// colorSpace: nil skips output color matching, so values are in CI's linear working space.
+    static func averageCI(in pixelBuffer: CVPixelBuffer, region: CGRect,
+                          context: CIContext = FrameEncoder.context) -> LinearColor? {
+        let image = CIImage(cvPixelBuffer: pixelBuffer)
+        let w = image.extent.width, h = image.extent.height
+        let filter = CIFilter.areaAverage()
+        filter.inputImage = image
+        filter.extent = CGRect(x: region.minX * w, y: (1 - region.maxY) * h,
+                               width: region.width * w, height: region.height * h)
+        guard let output = filter.outputImage else { return nil }
+        var pixel = [Float](repeating: 0, count: 4)
+        context.render(output, toBitmap: &pixel, rowBytes: 4 * MemoryLayout<Float>.size,
+                       bounds: output.extent, format: .RGBAf, colorSpace: nil)
+        return LinearColor(r: Double(pixel[0]), g: Double(pixel[1]), b: Double(pixel[2]))
+    }
+}
+```
+
+Usage:
+
+```swift
+let camera = CameraManager()
+guard await CameraManager.requestAccess() else { /* show the §6 guidance */ return }
+try await camera.configure()                          // system-preferred camera
+camera.setFrameHandler { pixelBuffer, _ in            // frame queue, up to 30 fps; throttle as needed
+    guard let left = RegionColor.average(in: pixelBuffer, region: CGRect(x: 0, y: 0.2, width: 0.3, height: 0.6)),
+          let right = RegionColor.average(in: pixelBuffer, region: CGRect(x: 0.7, y: 0.2, width: 0.3, height: 0.6))
+    else { return }
+    Task { @MainActor in lightingModel.cameraReading(left: left, right: right) }   // lightingModel: a @MainActor object
+}
+camera.start()
+```
+
+To turn a rectangle the user drew on the preview into buffer coordinates, use `previewLayer.metadataOutputRectConverted(fromLayerRect:)`. It returns normalized, unmirrored device coordinates with a top-left origin; points use `captureDevicePointConverted(fromLayerPoint:)`. Both work on macOS 10.15+. They handle aspect-fit letterboxing and preview mirroring.
+
+### 5.3 SwiftUI preview
+
+```swift
+// CameraPreview.swift
+import AVFoundation
+import SwiftUI
+
+struct CameraPreview: NSViewRepresentable {
+    let session: AVCaptureSession
+    var gravity: AVLayerVideoGravity = .resizeAspect
+
+    func makeNSView(context: Context) -> PreviewView {
+        let view = PreviewView()
+        view.previewLayer.session = session
+        view.previewLayer.videoGravity = gravity
+        return view
+    }
+
+    func updateNSView(_ view: PreviewView, context: Context) {
+        if view.previewLayer.session !== session { view.previewLayer.session = session }
+        view.previewLayer.videoGravity = gravity
+    }
+
+    static func dismantleNSView(_ view: PreviewView, coordinator: ()) {
+        view.previewLayer.session = nil
+    }
+
+    /// The backing layer *is* the preview layer, so it tracks the view's size without layout code.
+    final class PreviewView: NSView {
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            wantsLayer = true                       // makes AppKit call makeBackingLayer()
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+        override func makeBackingLayer() -> CALayer { AVCaptureVideoPreviewLayer() }
+
+        var previewLayer: AVCaptureVideoPreviewLayer { layer as! AVCaptureVideoPreviewLayer }
+    }
+}
+
+// CameraPreview(session: camera.session).frame(minWidth: 320, minHeight: 180)
+```
+
+### 5.4 Exposure and white balance on macOS
+
+```swift
+import AVFoundation
+
+extension AVCaptureDevice {
+    /// Freezes auto exposure and auto white balance at their current values where the device allows it.
+    /// Returns what was actually locked. Call on the session queue (CameraManager.withDevice).
+    @discardableResult
+    func lockExposureAndWhiteBalance() throws -> (exposure: Bool, whiteBalance: Bool) {
+        try lockForConfiguration()
+        defer { unlockForConfiguration() }
+        var locked = (exposure: false, whiteBalance: false)
+        if isExposureModeSupported(.locked) { exposureMode = .locked; locked.exposure = true }
+        if isWhiteBalanceModeSupported(.locked) { whiteBalanceMode = .locked; locked.whiteBalance = true }
+        return locked
+    }
+
+    func restoreAutomaticExposureAndWhiteBalance() throws {
+        try lockForConfiguration()
+        defer { unlockForConfiguration() }
+        if isExposureModeSupported(.continuousAutoExposure) { exposureMode = .continuousAutoExposure }
+        if isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { whiteBalanceMode = .continuousAutoWhiteBalance }
+    }
+}
+```
+
+What the macOS SDK actually offers:
+
+| API | macOS |
+|---|---|
+| `exposureMode` (`.locked`, `.autoExpose`, `.continuousAutoExposure`) + `isExposureModeSupported(_:)` | ✅ available. Whether `.locked` is supported is per device |
+| `whiteBalanceMode` (`.locked`, `.autoWhiteBalance`, `.continuousAutoWhiteBalance`) + `isWhiteBalanceModeSupported(_:)` | ✅ available. Per device |
+| `focusMode`, `exposurePointOfInterest`, `focusPointOfInterest`, `isAdjustingExposure`, `isAdjustingWhiteBalance` | ✅ available |
+| `exposureRectOfInterest`, `focusRectOfInterest` | macOS **26.0+** |
+| `setExposureModeCustom(duration:iso:)`, `exposureDuration`, `iso`, `setExposureTargetBias`, `exposureTargetOffset`, `lensPosition`, `activeMaxExposureDuration` | ❌ unavailable (compile error) |
+| `deviceWhiteBalanceGains`, `setWhiteBalanceModeLocked(with:completionHandler:)`, `maxWhiteBalanceGain`, `isLockingWhiteBalanceWithCustomDeviceGainsSupported` | ❌ unavailable, so there are no manual white-balance gains |
+| `AVCaptureDevice.centerStageControlMode` / `isCenterStageEnabled` (class, macOS 12.3) | ✅. Set the mode to `.app` or `.cooperative` before writing `isCenterStageEnabled` |
+| `isStudioLightEnabled` (13), `isPortraitEffectEnabled` (12), `reactionEffectsEnabled` (14), `isBackgroundReplacementEnabled` (15): class, read-only | ✅ read-only, controlled by the user in Control Center. `AVCaptureDevice.showSystemUserInterface(.videoEffects)` opens the panel |
+
+Pitfalls for "does the lighting look right?":
+
+| Pitfall | Effect | Mitigation |
+|---|---|---|
+| Auto white balance | Pulls colored light toward neutral. A teal wall drifts gray within about a second | Lock white balance if supported. Compare *relative* hue between regions or against a white/gray reference card in frame. Sample right after a change, before AWB adapts. Tell the vision LLM about AWB (the §4.1 prompt does) |
+| Auto exposure | Brightening a light makes the camera darken the frame, so measured change is near 0 | Lock exposure before changes. Compare brightness *ratios* between regions instead of absolute levels |
+| Many UVC webcams only report continuous auto | `isExposureModeSupported(.locked)` / `isWhiteBalanceModeSupported(.locked)` return false | Detect it and say so in the UI. Fall back to relative measurements. Hardware controls exist only via UVC control requests over IOKit (vendor tools); there's no AVFoundation path |
+| System video effects | Studio Light relights faces, Portrait blurs the background, Background replacement swaps it, Center Stage crops and pans | Check the class properties above and warn. Disable Center Stage with `centerStageControlMode = .app` + `isCenterStageEnabled = false` so regions stay put |
+| Reconfiguration | Changing input, preset or format can reset device locks | Re-apply locks after `configure(...)` |
+| Continuity Camera (iPhone) | Applies iPhone tone mapping and processing | ⚠️ Lock support varies; check the `isSupported` flags at runtime |
+| Settling time | Fixture fades plus AE/AWB convergence | Wait for `!isAdjustingExposure && !isAdjustingWhiteBalance` (⚠️ may always be false on UVC) or a fixed ~0.5 s before sampling or uploading a frame |
+
+---
+
+## 6. Permissions: status, requests, deep links, UX
+
+### 6.1 What each feature needs
+
+| Feature | TCC service / pane | Info.plist key (§0.3) | Status API | Request API |
+|---|---|---|---|---|
+| Microphone / line-in (§1.4, §2) | Microphone | `NSMicrophoneUsageDescription` | `AVCaptureDevice.authorizationStatus(for: .audio)` (or `AVAudioApplication.shared.recordPermission`, 14+) | `AVCaptureDevice.requestAccess(for: .audio)` (or `AVAudioApplication.requestRecordPermission()`, 14+) |
+| Camera (§5) | Camera | `NSCameraUsageDescription` (+ `NSCameraUseContinuityCameraDeviceType`) | `AVCaptureDevice.authorizationStatus(for: .video)` | `AVCaptureDevice.requestAccess(for: .video)` |
+| Speech recognition (§2) | Speech Recognition | `NSSpeechRecognitionUsageDescription` | `SFSpeechRecognizer.authorizationStatus()` | `SFSpeechRecognizer.requestAuthorization(_:)` (`SpeechPermissions`, §2.1) |
+| ScreenCaptureKit audio (§1.3) | Screen & System Audio Recording | — | `CGPreflightScreenCaptureAccess()` (granted or not; it can't distinguish "never asked") | `CGRequestScreenCaptureAccess()` (prompts once; the grant applies after relaunch) |
+| Core Audio process tap (§1.2) | System audio recording (listed on the Screen & System Audio Recording pane) | `NSAudioCaptureUsageDescription` | ❌ no public API (heuristic or SPI, §1.2.3) | Implicit: the prompt appears when the tap first starts I/O |
+
+> [!IMPORTANT]
+> Missing usage strings get the process killed by TCC on first access, for camera, microphone and speech alike. TCC also attributes requests to the *responsible* process. When the binary runs from Terminal or `swift run`, prompts and grants go to Terminal. Test permission flows by launching the bundle (`open Prism.app`).
+
+### 6.2 `Permissions` and `PrivacyPane`
+
+```swift
+// Permissions.swift
+import AppKit
+import AVFoundation
+import CoreGraphics
+import Speech
+
+enum PermissionState: String, Sendable {
+    case notDetermined, granted, denied, restricted
+    /// No public API can tell (system-audio capture via process taps).
+    case unknown
+}
+
+enum Permissions {
+    // MARK: Status (cheap; call on every app activation)
+
+    static func microphone() -> PermissionState { state(AVCaptureDevice.authorizationStatus(for: .audio)) }
+    static func camera() -> PermissionState { state(AVCaptureDevice.authorizationStatus(for: .video)) }
+
+    static func speechRecognition() -> PermissionState {
+        switch SFSpeechRecognizer.authorizationStatus() {
+        case .notDetermined: return .notDetermined
+        case .authorized: return .granted
+        case .denied: return .denied
+        case .restricted: return .restricted
+        @unknown default: return .unknown
+        }
+    }
+
+    /// Screen & System Audio Recording (ScreenCaptureKit, §1.3). false = never asked OR denied.
+    static func screenRecording() -> PermissionState {
+        CGPreflightScreenCaptureAccess() ? .granted : .notDetermined
+    }
+
+    /// Core Audio process taps (§1.2): no public status API. After starting a tap, use
+    /// SystemAudioTap.looksLikePermissionDenied(after:) or the private probe in §1.2.3.
+    static func systemAudioCapture() -> PermissionState { .unknown }
+
+    private static func state(_ status: AVAuthorizationStatus) -> PermissionState {
+        switch status {
+        case .notDetermined: return .notDetermined
+        case .authorized: return .granted
+        case .denied: return .denied
+        case .restricted: return .restricted
+        @unknown default: return .unknown
+        }
+    }
+
+    // MARK: Requests (the system prompt appears only while the state is .notDetermined)
+
+    static func requestMicrophone() async -> Bool { await AVCaptureDevice.requestAccess(for: .audio) }
+    static func requestCamera() async -> Bool { await AVCaptureDevice.requestAccess(for: .video) }
+
+    static func requestSpeechRecognition() async -> PermissionState {
+        _ = await SpeechPermissions.requestSpeechRecognition()      // §2.1
+        return speechRecognition()
+    }
+
+    /// Prompts once per app identity. Returns false right after the user grants it; the grant applies after relaunch.
+    @discardableResult
+    static func requestScreenRecording() -> Bool { CGRequestScreenCaptureAccess() }
+}
+
+enum PrivacyPane: String, CaseIterable, Sendable {
+    case microphone = "Privacy_Microphone"
+    case camera = "Privacy_Camera"
+    case speechRecognition = "Privacy_SpeechRecognition"
+    case screenAndSystemAudioRecording = "Privacy_ScreenCapture"
+
+    /// Process-tap permission lives on the Screen & System Audio Recording pane.
+    /// ⚠️ A dedicated "Privacy_AudioCapture" anchor is unverified; don't rely on it.
+    static let systemAudio = PrivacyPane.screenAndSystemAudioRecording
+
+    @MainActor
+    func open() {
+        // The legacy pane ID still routes into System Settings; the PrivacySecurity.extension form is the
+        // newer spelling. NSWorkspace.open returns true even for unknown anchors, so order matters.
+        let candidates = [
+            "x-apple.systempreferences:com.apple.preference.security?\(rawValue)",
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?\(rawValue)",
+        ]
+        for candidate in candidates {
+            if let url = URL(string: candidate), NSWorkspace.shared.open(url) { return }
+        }
+    }
+}
+```
+
+Re-check whenever the app becomes active, for example after the user returns from System Settings:
+
+```swift
+import AppKit
+import Observation
+
+@MainActor
+@Observable
+final class PermissionMonitor {
+    private(set) var microphone = Permissions.microphone()
+    private(set) var camera = Permissions.camera()
+    private(set) var speech = Permissions.speechRecognition()
+    private(set) var screenRecording = Permissions.screenRecording()
+
+    @ObservationIgnored private var observer: NSObjectProtocol?    // app-lifetime object: never removed
+
+    init() {
+        observer = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refresh() }
+        }
+    }
+
+    func refresh() {
+        microphone = Permissions.microphone()
+        camera = Permissions.camera()
+        speech = Permissions.speechRecognition()
+        screenRecording = Permissions.screenRecording()
+    }
+}
+```
+
+### 6.3 Graceful flow
+
+```mermaid
+flowchart TD
+    A["User turns on a feature<br/>(Music reactive, Voice control, Camera check)"] --> B{"Status?"}
+    B -- granted --> G["Start the feature"]
+    B -- notDetermined --> C["App's own explainer sheet:<br/>what is captured, stays on device"]
+    C --> D["System request API"]
+    D --> B2{"Granted?"}
+    B2 -- yes --> G
+    B2 -- no --> E["Inline banner + 'Open System Settings'<br/>PrivacyPane.open()"]
+    B -- "denied / restricted" --> E
+    E --> F["didBecomeActive → refresh()"]
+    F --> B
+    G --> H{"System audio tap silent<br/>while others play?"}
+    H -- yes --> I["Suggest System Settings ▸ Privacy ▸<br/>Screen & System Audio Recording,<br/>then Quit & Reopen"]
+```
+
+Guidelines:
+- **Ask at the point of use, never at launch.** Each feature works independently: music-reactive mode without voice, voice without the camera, and so on.
+- **Explain before the one-shot system prompt.** Prompts appear only once per app identity. After a denial, the only path is System Settings.
+- **Relaunch for screen and system-audio grants.** These need a relaunch (System Settings offers "Quit & Reopen"), so say so in the banner. Microphone, camera and speech grants apply to the next request.
+- **⚠️ Revoking while running.** On recent macOS, revoking a permission while the app runs may terminate it. Persist state so a relaunch restores the session.
+- **Ad-hoc signing.** Every rebuild with a new ad-hoc signature looks like a new app to TCC (and the keychain), so prompts reappear. Use a stable signing identity for testers (§0.3). Reset during development with `tccutil reset Microphone <bundle-id>` (also `Camera`, `SpeechRecognition`, `ScreenCapture`).
+
+---
+
+## 7. Open questions and API uncertainties
+
+Verified means checked against the macOS 26.5 SDK headers/swiftinterfaces, Apple documentation or sample code, or provider API docs (November 2026). Everything below is **not fully verified**; test it on real hardware.
+
+| Area | Uncertainty | Mitigation in this doc |
+|---|---|---|
+| Process taps | No public API reports audio-capture permission. Denial looks like silent buffers | Silence heuristic + `anyOtherProcessIsPlayingAudio()`. Optional private `TCCAccessPreflight` probe (SPI, may break) |
+| Process taps | Whether a global tap's private aggregate must be rebuilt when the default output device changes | Debounced rebuild on `kAudioHardwarePropertyDefaultOutputDevice` (harmless if unnecessary) |
+| Process taps | Prompt wording and pane placement on 14.2–14.x versus 15+. Whether a grant in the upper "Screen & System Audio Recording" list also covers taps | Deep-link to `Privacy_ScreenCapture` and explain both lists |
+| Process taps | `Privacy_AudioCapture` URL anchor and the `tccutil reset AudioCapture` service name | Not relied on |
+| Process taps | The explicit designated-requirement trick for keeping TCC grants across ad-hoc rebuilds | Prefer a stable self-signed certificate |
+| Process taps | Level halving on multichannel mixdown. Whether taps capture pre- or post-volume | Normalize levels adaptively (AGC) in the analyzer |
+| ScreenCaptureKit | Clock domain of audio PTS. Cadence of the periodic "still allow?" re-confirmation on macOS 15+ | Treat timestamps as relative. Handle `didStopWithError` and re-prompt |
+| Speech | `kAFAssistantErrorDomain` codes (e.g. 1110 "no speech") are undocumented | Treat unknown errors as restartable, with backoff |
+| Speech | Effect of `contextualStrings` / `AnalysisContext` on `SpeechTranscriber` accuracy. Using `SpeechDetector` standalone | Wake-phrase matching tolerates misspellings (`normalize`) |
+| Speech | Side effects of voice-processing I/O (ducking other audio) | Use it only on the speech engine, with `.min` ducking (§1.4) |
+| TTS | `AVSpeechSynthesizer` may render out-of-process, so the tap's own-process exclusion might not hide it | Pause audio analysis while speaking (`onSpeakingChanged`) |
+| Foundation Models | Whether FoundationModels gets weak-linked automatically for a macOS 14 deployment target | `-weak_framework` linker flag + `otool -L` CI check (§0.3) |
+| Foundation Models | Macro plugin discovery under `swift build` (needs a full Xcode via `DEVELOPER_DIR`) | §0.3 |
+| Foundation Models | Scope of `.permissiveContentTransformations`; when `.rateLimited` hits a foreground Mac app; latency figures; actual output for the sample sentence | Fallback chain (§3.5); test on device |
+| Cloud | Model IDs, reasoning-effort support, Anthropic's rejection of sampling parameters (`2026-10-21`) and its forced `tool_choice` restriction all change quickly | Model ID is a user setting. Error bodies are surfaced |
+| Camera | Per-device support for `.locked` exposure/white balance (UVC webcams, Continuity Camera). Whether macOS honors width/height in `videoSettings`. `isAdjusting*` on UVC | Runtime `isSupported` checks, relative measurements, fixed settle delay |
+| SDK drift | Helpers seen in newer docs (`AnalyzerInputConverter`, `CaptureInputSequenceProvider`, `AssetInputSequenceProvider`) are absent from the 26.5 SDK | Not used; manual `AVAudioConverter` path (§2.2) |
+| Settings URLs | Legacy `com.apple.preference.security?Privacy_*` anchors on future macOS | Falls back to the `PrivacySecurity.extension` form |

@@ -20,17 +20,24 @@ Always pass absolute paths under `/home/antigravity/wt/<name>` to file tools.
 ## 2. Building and testing
 
 The dev VM is Linux (2 CPUs, 8 GB). It can build `PrismCore`, `PrismServer` and
-`PrismDevServer` but **not** the macOS app (SwiftUI/AppKit). A global lock serializes
+`PrismDevServer`, but **not** the macOS app (SwiftUI/AppKit). A global lock serializes
 compiles across all agents, so batch your edits before compiling.
 
 ```bash
-scripts/linux-swift.sh build --target PrismCore          # quick core check
-scripts/linux-swift.sh build --build-tests               # everything Linux can build
-scripts/linux-swift.sh test --skip-build --filter PrismCoreTests.MyTests
+scripts/core-test.sh                          # PrismCore + its tests, no swift-nio (~15 s cold)
+scripts/core-test.sh --filter ColorTests      # a subset
+scripts/linux-swift.sh build --build-tests    # everything Linux can build (remote team; compiles swift-nio once, ~4 min)
 ```
 
-The first build in a new worktree compiles swift-nio (~3–5 min). After that, builds are
-incremental.
+- **Use `scripts/core-test.sh` by default.** It sets `PRISM_CORE_ONLY=1` and builds into
+  `.build-core/`, so it never compiles swift-nio.
+- Only the remote team (PrismServer/PrismDevServer) needs the full build.
+- `PrismApp` code isn't compiled on Linux at all, so review it extra carefully before pushing:
+  - macOS 14 availability, with newer APIs behind `if #available`;
+  - exact SwiftUI/AppKit signatures;
+  - `@MainActor` isolation and `Sendable`;
+  - no name clashes with system frameworks. For example, `RGBColor` clashes with QuickDraw,
+    which is why our type is called `RGB`.
 
 The macOS app is compiled, unit-tested, self-tested and screenshotted by CI on GitHub's
 macOS runners. Push your branch, then wait for the result:
@@ -41,8 +48,16 @@ scripts/ci-wait.sh agent/<name>     # blocks until done; prints errors; exit 0 =
 ```
 
 `ci-wait.sh` downloads the screenshot artifact to `/tmp/prism-ci/<run-id>/screenshots/`.
-**Look at the PNGs with the file viewer** — that is the only way to see the UI. Judge them
+**Look at the PNGs with the file viewer.** That is the only way to see the UI. Judge them
 critically: alignment, spacing, contrast, clipped text, empty states, beauty.
+
+Screenshot facts:
+- The runner display is 1024×768 pt, so the 1440 pt window overhangs both edges and captures
+  come out about 1440×732.
+- Captures come from the window server, so glass and vibrancy render correctly.
+- `tour.log` lists each scene and its capture method.
+- The CI log (`gh run view --log-failed`, or the job log) includes the app's launch log. Look
+  for warnings there too.
 
 CI capacity is limited (≈5 concurrent macOS jobs shared by everyone): push when you have
 a meaningful batch (not every small edit). Make each push count by reviewing your Swift
@@ -107,3 +122,9 @@ Need a bigger change in someone else's area? Message the orchestrator.
 - Swift toolchain (Linux): `/home/antigravity/toolchains/swift-6.4.2-RELEASE-debian12/usr/bin`
   (use `scripts/linux-swift.sh`, it sets PATH and takes the lock).
 - Do not delete or rewrite other agents' worktrees (`/home/antigravity/wt/*`).
+- Disk is shared (about 14 GB free). Don't copy large files around. When you finish, remove
+  your `.build*` directories.
+- `gh` and `ci-wait.sh` can take minutes. Prefer running them as one background command, then
+  wait for the completion notification instead of polling in a loop.
+- If you lose context (compaction), re-read your brief and `git log` on your branch, then
+  continue. The briefs are the source of truth for scope.

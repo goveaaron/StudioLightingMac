@@ -20,7 +20,7 @@ enum ScreenshotTour {
         coreScenes
             + StageTour.scenes + InspectorTour.scenes + LooksTour.scenes + PatchTour.scenes
             + MusicTour.scenes + CameraTour.scenes + RemoteTour.scenes + AssistantTour.scenes
-            + OutputTour.scenes + OnboardingTour.scenes
+            + OutputTour.scenes + OnboardingTour.scenes + EffectsTour.scenes
     }
 
     static var coreScenes: [Scene] {
@@ -103,7 +103,10 @@ enum ScreenshotTour {
         var frame = w.frame
         frame.size = w.frameRect(forContentRect: NSRect(origin: .zero, size: size)).size
         if let screen = w.screen ?? NSScreen.main {
-            frame.origin = NSPoint(x: screen.visibleFrame.minX, y: screen.visibleFrame.maxY - frame.height)
+            // Centered horizontally: on small CI displays (1024 pt wide) the window overhangs both
+            // edges, but centered sheets and popovers stay fully on-screen.
+            frame.origin = NSPoint(x: screen.visibleFrame.midX - frame.width / 2,
+                                   y: screen.visibleFrame.maxY - frame.height)
         }
         w.setFrame(frame, display: true)
         w.makeKeyAndOrderFront(nil)

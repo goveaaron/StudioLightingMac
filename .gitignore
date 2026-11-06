@@ -17,3 +17,4 @@ __pycache__/
 WebRemote/node_modules/
 tools/web-test/node_modules/
 tools/web-test/screenshots/
+/.build-core

@@ -116,7 +116,8 @@ jobs:
           key: macos-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
 
   # The app is built on macOS 26 with a macOS 14 deployment target: make sure it really
-  # launches and passes its self-test on older systems (weak-linked frameworks etc.).
+  # launches and passes its self-test on an older system (weak-linked frameworks etc.).
+  # (GitHub retired the macos-14 image in 2026, so macOS 15 is the oldest we can run.)
   launch-older-macos:
     name: Launch · ${{ matrix.os }}
     needs: macos
@@ -124,7 +125,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15]
+        os: [macos-15]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:

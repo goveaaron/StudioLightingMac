@@ -35,15 +35,21 @@ enum WorkspaceTab: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-/// Modal sheets presented over the main window.
+/// Modal sheets presented over the main window. Each case's view lives in its owner's folder.
 enum AppSheet: String, Identifiable {
-    case addFixture
-    case exportProject
-    case importLightkey
-    case keyboardShortcuts
-    case hardwareTest
-    case lightFinder
-    case welcome
+    case addFixture         // Patch
+    case exportProject      // Shell
+    case importLightkey     // Patch
+    case keyboardShortcuts  // Shell
+    case hardwareTest       // Hardware (Output/)
+    case lightFinder        // Camera
+    case welcome            // Shell (Onboarding/)
+    case templates          // Shell (Onboarding/)
+    case setupCards         // Patch — step-by-step "set your light to…" cards
+    case addressScan        // Patch — find lights you're unsure of (no camera)
+    case troubleshooter     // Patch — "a light isn't responding"
+    case profileEditor      // Patch — build/edit a fixture profile
+    case shareRemote        // Remote — QR code + share link
 
     var id: String { rawValue }
 }

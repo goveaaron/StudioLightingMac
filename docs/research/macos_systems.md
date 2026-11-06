@@ -2251,11 +2251,15 @@ final class QuickTunnel: @unchecked Sendable {
     private var log = ""
     private var announced = false
 
-    func start(cloudflared: URL, localPort: UInt16) throws {
+    /// - Parameter allowedMail: optional email gate (`--allowed-mail`, cloudflared ≥ 2026.9.3, §7.1),
+    ///   e.g. ["me@example.com"] or ["*@example.com"].
+    func start(cloudflared: URL, localPort: UInt16, allowedMail: [String] = []) throws {
         stop()
         let p = Process()
         p.executableURL = cloudflared
-        p.arguments = ["tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:\(localPort)"]
+        var args = ["tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:\(localPort)"]
+        if !allowedMail.isEmpty { args += ["--allowed-mail", allowedMail.joined(separator: ",")] }
+        p.arguments = args
         let pipe = Pipe()
         p.standardOutput = pipe
         p.standardError = pipe                                  // banner + logs go to stderr
@@ -2701,3 +2705,388 @@ Send OSC with `UDPSocket.send(OSCPacket.message(…).encoded(), to: host, port: 
 ports: TouchOSC 8000/9000, QLab 53000/53001.
 
 ---
+
+## 9. Sleep prevention, launch at login, single instance
+
+### 9.1 Keeping the Mac awake while outputting ✅ (IOPMLib.h, QA1340; same calls as ControlPlane, cmux, apple/security-pcc)
+
+What sleep does to Prism: the USB bus is suspended (the FTDI widget may come back as a *new*
+`IOSerialBSDClient`, so you hit the `ENXIO` and reconnect path in §2.5) and sockets go quiet. An
+ENTTEC Pro has no new data, so the rig doesn't black out. It freezes on the last look until the Mac
+wakes.
+
+| Mechanism | Prevents | Does not prevent |
+|---|---|---|
+| `kIOPMAssertionTypePreventUserIdleSystemSleep` (`caffeinate -i`) | Idle system sleep | Lid close (unless in clamshell mode with an external display and power), Apple menu › Sleep, low battery, thermal sleep. The display can still sleep, which is fine for DMX |
+| `kIOPMAssertionTypePreventUserIdleDisplaySleep` (`caffeinate -d`) | Idle display sleep. Use it for an optional "keep screen on during show" setting | — |
+| `ProcessInfo.beginActivity(options: .userInitiated…)` | **App Nap** and timer throttling, plus idle system sleep (`.userInitiated` includes `.idleSystemSleepDisabled`) | Same as the first row |
+| `kIOPMAssertionTypePreventSystemSleep` (`caffeinate -s`) | System sleep, but only on AC power | Not needed by Prism |
+
+Hold these only while at least one output is running, so an idle laptop can still sleep:
+
+```swift
+import Foundation
+import IOKit.pwr_mgt
+
+/// Keeps the Mac from idle-sleeping and disables App Nap while at least one output runs.
+/// Reference-counted and thread-safe: `acquire()` when an output starts, `release()` when it stops.
+final class KeepAwake: @unchecked Sendable {
+    static let shared = KeepAwake()
+
+    private let lock = NSLock()
+    private var count = 0
+    private var activity: NSObjectProtocol?
+    private var systemAssertion: IOPMAssertionID = 0          // 0 == kIOPMNullAssertionID
+    private var displayAssertion: IOPMAssertionID = 0
+    private var keepDisplayOn = false
+
+    func acquire(reason: String = "Prism is sending DMX") {
+        lock.lock(); defer { lock.unlock() }
+        count += 1
+        guard count == 1 else { return }
+        // .userInitiated: no App Nap, no idle system sleep. .latencyCritical: no timer coalescing.
+        activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .latencyCritical],
+                                                         reason: reason)
+        systemAssertion = Self.createAssertion(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString, reason)
+        if keepDisplayOn {
+            displayAssertion = Self.createAssertion(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString, reason)
+        }
+    }
+
+    func release() {
+        lock.lock(); defer { lock.unlock() }
+        guard count > 0 else { return }
+        count -= 1
+        guard count == 0 else { return }
+        Self.releaseAssertion(&systemAssertion)
+        Self.releaseAssertion(&displayAssertion)
+        if let activity { ProcessInfo.processInfo.endActivity(activity) }
+        activity = nil
+    }
+
+    /// Optional "keep the screen on while a show runs" setting.
+    func setKeepDisplayOn(_ on: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        keepDisplayOn = on
+        if on, count > 0, displayAssertion == 0 {
+            displayAssertion = Self.createAssertion(kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
+                                                    "Prism show running")
+        } else if !on {
+            Self.releaseAssertion(&displayAssertion)
+        }
+    }
+
+    private static func createAssertion(_ type: CFString, _ reason: String) -> IOPMAssertionID {
+        var id: IOPMAssertionID = 0
+        let result = IOPMAssertionCreateWithName(type, IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                                 reason as CFString, &id)
+        return result == kIOReturnSuccess ? id : 0
+    }
+
+    private static func releaseAssertion(_ id: inout IOPMAssertionID) {
+        if id != 0 { IOPMAssertionRelease(id); id = 0 }
+    }
+}
+```
+
+- The `kIOPMAssertionType…` names are `CFSTR()` macros, and Swift imports them as `String`. Writing
+  `as CFString` compiles whether the SDK hands you `String` or `CFString`. `kIOPMAssertionLevelOn`
+  comes in as `Int`, so wrap it in `IOPMAssertionLevel(...)`.
+- To check it: `pmset -g assertions | grep -i prism` should show
+  `PreventUserIdleSystemSleep named: "Prism is sending DMX"`. Activity Monitor's *Preventing Sleep*
+  column should say *Yes*, and its *App Nap* column *No*.
+- The kernel drops assertions when the process exits, including after a crash.
+- The Info.plist template in 4.2 doesn't opt into `NSSupportsSuddenTermination` or
+  `NSSupportsAutomaticTermination`, and should stay that way. If someone adds one, also call
+  `ProcessInfo.processInfo.disableSuddenTermination()` while outputting.
+
+The Mac can still sleep (lid closed, Apple menu), so recover on wake:
+
+```swift
+import AppKit
+
+/// Re-open widgets and resend full frames after wake. LAN addresses may have changed too (§5.4).
+final class SleepWakeObserver {
+    private var tokens: [NSObjectProtocol] = []
+
+    init(onSleep: @escaping () -> Void, onWake: @escaping () -> Void) {
+        let center = NSWorkspace.shared.notificationCenter     // NOT NotificationCenter.default
+        tokens.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil,
+                                         queue: .main) { _ in onSleep() })
+        tokens.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil,
+                                         queue: .main) { _ in onWake() })
+    }
+
+    deinit { tokens.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) } }
+}
+```
+
+### 9.2 Launch at login ✅ (`SMAppService`, macOS 13+; pattern from sindresorhus/LaunchAtLogin-Modern)
+
+```swift
+import AppKit
+import ServiceManagement
+
+/// "Launch at login" through SMAppService.mainApp. Always show the *live* status: the user can
+/// change it at any time in System Settings › General › Login Items & Extensions.
+enum LaunchAtLogin {
+    private static let wantedKey = "launchAtLogin"        // the user's intent, kept across updates
+
+    static var status: SMAppService.Status { SMAppService.mainApp.status }
+    static var isEnabled: Bool { status == .enabled }
+
+    /// Only an installed .app can register. `swift run` (no bundle) and translocated copies can't.
+    static var canRegister: Bool {
+        let url = Bundle.main.bundleURL
+        return Bundle.main.bundleIdentifier != nil
+            && url.pathExtension == "app"
+            && !url.path.contains("/AppTranslocation/")
+    }
+
+    /// Call from the Settings toggle. Show any thrown error to the user.
+    static func setEnabled(_ enabled: Bool) throws {
+        UserDefaults.standard.set(enabled, forKey: wantedKey)
+        let service = SMAppService.mainApp
+        if enabled {
+            if service.status == .enabled { try? service.unregister() }   // re-register = refresh (as LaunchAtLogin-Modern)
+            try service.register()
+            if service.status == .requiresApproval { SMAppService.openSystemSettingsLoginItems() }
+        } else if service.status == .enabled || service.status == .requiresApproval {
+            try service.unregister()
+        }
+    }
+
+    /// Call once per launch. If the user wanted launch-at-login but the item disappeared
+    /// (for example after an update changed the signature), register it again.
+    static func repairIfNeeded() {
+        guard canRegister, UserDefaults.standard.bool(forKey: wantedKey) else { return }
+        if status == .notRegistered || status == .notFound { try? SMAppService.mainApp.register() }
+    }
+
+    /// True if this launch came from the login item. Only valid inside applicationDidFinishLaunching.
+    static var wasLaunchedAtLogin: Bool {
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        return event?.eventID == kAEOpenApplication
+            && event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    }
+}
+```
+
+- `register()` adds Prism under *Open at Login* and macOS shows a "Login Item Added" notification.
+  `.requiresApproval` means the user turned it off in System Settings, and
+  `SMAppService.openSystemSettingsLoginItems()` takes them there.
+- For unattended installs, `wasLaunchedAtLogin` lets Prism reopen the last show and start output by
+  itself.
+- ⚠️ **Ad-hoc signing:** Background Task Management stores login items with the app's code-signing
+  identity. An ad-hoc identity (the cdhash) changes with every release, so after an update the item
+  might stop launching or show up twice. This is not confirmed. `repairIfNeeded()` plus the stable
+  self-signed certificate from 4.7 are the mitigations. To inspect, run `sfltool dumpbtm` (it may ask
+  for an admin password). `sfltool resetbtm` resets *every* app's background items, so use it only as a
+  last resort.
+- There's always a manual fallback: the user adds Prism with **+** under Login Items.
+
+### 9.3 Single instance and a clean quit ✅
+
+- If Prism is already running **from the same path**, LaunchServices brings that copy forward instead
+  of starting another one. That covers Finder, the Dock, `open`, `open prism://…`, and double-clicking
+  a `.prismlights` file. A second process still starts when:
+  - a second copy at a different path is launched. Two copies with the same bundle ID can run side
+    by side, which is how Xcode and Xcode-beta coexist.
+  - someone runs `open -n`.
+  - someone runs `Contents/MacOS/Prism` directly.
+- Two Prisms conflict everywhere. The second one's widget `open` fails with `EBUSY` (`TIOCEXCL`,
+  §2.4) and its server bind fails with `EADDRINUSE`. Both would send Art-Net/sACN. With the same
+  persistent sACN CID (§3.4), receivers see one CID with interleaved sequence numbers, so they drop
+  packets and the output flickers.
+- `LSMultipleInstancesProhibited` only blocks a second instance in **another user session** (fast
+  user switching). It doesn't help here.
+
+```swift
+import AppKit
+
+@MainActor
+enum SingleInstance {
+    /// Call first in applicationWillFinishLaunching, before any port, socket or output is opened.
+    /// If another Prism process is running, bring it forward and quit this one.
+    static func enforce() {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }   // `swift run`: no Info.plist
+        let myPID = ProcessInfo.processInfo.processIdentifier
+        guard let other = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first(where: { $0.processIdentifier != myPID && !$0.isTerminated }) else { return }
+        NSApp.yieldActivation(to: other)                 // macOS 14 cooperative activation
+        other.activate(options: [.activateAllWindows])   // best effort ⚠️ (may be ignored if we aren't active yet)
+        exit(EXIT_SUCCESS)                               // nothing is initialised yet, so a plain exit is safe
+    }
+}
+
+@MainActor
+enum TerminationSignals {
+    private static var sources: [DispatchSourceSignal] = []
+
+    /// SIGTERM (`pkill Prism`, the installer in 4.8, `kill`) and SIGINT (Ctrl-C when started from a
+    /// terminal) end the process immediately by default: no applicationWillTerminate, no blackout,
+    /// no save. This turns them into a normal AppKit quit.
+    static func install() {
+        for sig in [SIGTERM, SIGINT] {
+            signal(sig, SIG_IGN)                         // otherwise the default action kills us first
+            let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            source.setEventHandler {
+                MainActor.assumeIsolated { NSApp.terminate(nil) }
+            }
+            source.resume()
+            sources.append(source)                       // keep the sources alive
+        }
+    }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        SingleInstance.enforce()                         // may exit here
+        TerminationSignals.install()
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        LaunchAtLogin.repairIfNeeded()
+        if LaunchAtLogin.wasLaunchedAtLogin {
+            // Unattended install: reopen the last show and start output.
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Keep this short (the installer waits at most 10 s):
+        //  - outputs: optional blackout frame for ENTTEC; 3 × Stream_Terminated for sACN (§3.3)
+        //  - tunnel.stop(): SIGTERM to the cloudflared child (§7.3)
+        //  - save the show. Power assertions go away by themselves when the process exits.
+    }
+}
+
+// In the SwiftUI App:  @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+```
+
+- `NSApplicationDelegateAdaptor` forwards `applicationWillFinishLaunching` as well, so this works
+  with the SwiftUI app lifecycle.
+- `NSRunningApplication.runningApplications(withBundleIdentifier:)` includes the current process, so
+  filter on the PID. It only sees apps in the current user session.
+- If the handler closure ends up non-isolated (because the SDK marks it `@Sendable`),
+  `MainActor.assumeIsolated` is still correct, since the source fires on `.main`. It's harmless if
+  the closure is already main-actor isolated.
+
+---
+
+## 10. Sources & open uncertainties
+
+### 10.1 Sources
+
+**ENTTEC / widgets (§1)**
+- ENTTEC, *DMX USB Pro – API* (70304, firmware 1.44):
+  https://cdn.enttec.com/pdf/assets/70304/70304_DMX_USB_PRO_API.pdf
+- ENTTEC, *DMX USB Pro — User Manual* (driver note: no third-party driver needed since OS X 10.11):
+  https://support.enttec.com/user-manuals/dmx-usb-pro
+- ENTTEC, *DMX USB Pro Mk2 API* (now listed as a legacy product):
+  https://support.enttec.com/legacy-product/dmx-usb-pro-mk2-70314/dmx-usb-pro-mk2-api and the
+  Mk2 user manual https://cdn.enttec.com/pdf/assets/70314/70314_DMX_USB_PRO_MK2_USER_MANUAL.pdf
+- Open Lighting Architecture, https://github.com/OpenLightingProject/ola: `plugins/usbpro/`
+  `UsbProWidgetDetector.cpp`, `WidgetDetectorThread.h`, `BaseUsbProWidget.cpp`,
+  `EnttecUsbProWidget.cpp`, `UltraDMXProWidget.cpp`, `GenericUsbProWidget.cpp` (labels, detection
+  sequence, Mk2 port 2, DMXking extensions).
+
+**Serial (§2)**
+- Apple IOSerialFamily headers `IOSerialKeys.h`, `ioss.h` (in the macOS SDK; open source at
+  https://github.com/apple-oss-distributions/IOSerialFamily).
+- Apple, *Working With Serial* (archived device-file-access guide and SerialPortSample):
+  https://developer.apple.com/library/archive/documentation/DeviceDrivers/Conceptual/WorkingWSerial/
+- XNU `bsd/kern/tty.c` (VMIN/VTIME and `O_NONBLOCK` semantics, see §2.4).
+
+**Art-Net / sACN (§3)**
+- Artistic Licence, *Art-Net 4 specification*: https://art-net.org.uk/downloads/art-net.pdf
+- OLA `plugins/artnet/ArtNetPackets.h` (byte layout cross-check).
+- ANSI E1.31 (current revision E1.31-2018; packet layout unchanged since 2016), free from ESTA TSP:
+  https://tsp.esta.org/tsp/documents/published_docs.php
+- Hundemeier/sacn, https://github.com/Hundemeier/sacn: `sacn/messages/root_layer.py`,
+  `data_packet.py`, `sync_packet.py` (offset cross-check).
+
+**Bundling, signing, Gatekeeper (§4)**
+- Apple, *Information Property List* reference:
+  https://developer.apple.com/documentation/bundleresources/information_property_list
+- SwiftPM, https://github.com/swiftlang/swift-package-manager:
+  `Sources/Build/BuildDescription/SwiftModuleBuildDescription.swift` (native `Bundle.module`
+  accessor), `Sources/LLBuildManifest/LLBuildManifest.swift` (`embedInCode`),
+  `Sources/Runtimes/PackageDescription/Resource.swift`.
+- swift-build, https://github.com/swiftlang/swift-build:
+  `Sources/SWBTaskConstruction/TaskProducers/BuildPhaseTaskProducers/SourcesTaskProducer.swift`
+  (swiftbuild accessor), `Sources/SWBTaskExecution/TaskActions/GenerateEmbedInCodeAccessorTaskAction.swift`,
+  `Sources/SWBApplePlatform/AppIntentsMetadataTaskProducer.swift`.
+- Apple TN3127 *Inside Code Signing: Requirements*, TN3161 *Inside Code Signing: Certificates*, TN2206
+  *macOS Code Signing In Depth* (archive): https://developer.apple.com/documentation/technotes
+- Apple Support, *Safely open apps on your Mac*: https://support.apple.com/en-us/102445
+- Apple Support, *Create self-signed certificates in Keychain Access*:
+  https://support.apple.com/guide/keychain-access/create-self-signed-certificates-kyca8916/mac
+- E. Voleinik, *Preserve macOS App Permissions Across Rebuilds with Self-Signed Certificates*:
+  https://evoleinik.com/posts/macos-dev-signing-preserve-permissions/
+- apple-codesign / `rcodesign` 0.29: https://github.com/indygreg/apple-platform-rs
+
+**Local network, Bonjour (§5)**
+- Apple TN3179 *Understanding local network privacy* (rev. 2026-10-06):
+  https://developer.apple.com/documentation/technotes/tn3179-understanding-local-network-privacy
+- Apple TN3178 (unique `LC_UUID` per build), in the technotes index above.
+- `dns_sd.h` (mDNSResponder, https://github.com/apple-oss-distributions/mDNSResponder). Usage
+  pattern from mattt/iMCP, https://github.com/mattt/iMCP.
+
+**GitHub Actions (§6)**
+- actions/runner-images, https://github.com/actions/runner-images: README,
+  `images/macos/macos-26-arm64-Readme.md`, `images/macos/macos-15-arm64-Readme.md`,
+  `images/macos/scripts/build/configure-tccdb-macos.sh`.
+- GitHub Docs: *Actions limits* https://docs.github.com/en/actions/reference/limits, *GitHub-hosted
+  runners reference* https://docs.github.com/en/actions/reference/runners/github-hosted-runners,
+  *Billing and usage* https://docs.github.com/en/actions/concepts/billing-and-usage
+
+**Cloudflare (§7)**
+- *Quick Tunnels* (updated 2026-09-30): https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/
+- Cloudflare blog, *Protected Quick Tunnels* (2026-10-02): https://blog.cloudflare.com/protected-quick-tunnels/
+- cloudflared 2026.10.7 release (assets downloaded and hashed):
+  https://github.com/cloudflare/cloudflared/releases/tag/2026.10.7
+
+**MIDI / OSC (§8)**
+- CoreMIDI generated Swift interface (`MIDIServices`, `MIDIEventList.Builder`,
+  `MIDIEventPacket.WordCollection`) and https://developer.apple.com/documentation/coremidi
+- AudioKit (`MIDI+Receiving.swift`), https://github.com/AudioKit/AudioKit; bradhowes/morkandmidi,
+  https://github.com/bradhowes/morkandmidi; cmsj/Hammerspoon2 (`HSMIDIModule.swift`),
+  https://github.com/cmsj/Hammerspoon2
+- OSC 1.0 specification: https://opensoundcontrol.stanford.edu/spec-1_0.html (plus the OSC 1.1 NIME
+  2009 paper for the `T F N I` tags).
+
+**Power, login items, activation (§9)**
+- `IOKit/pwr_mgt/IOPMLib.h`; Apple QA1340:
+  https://developer.apple.com/library/archive/qa/qa1340/_index.html
+- `ProcessInfo` activities: https://developer.apple.com/documentation/foundation/processinfo
+- `SMAppService`: https://developer.apple.com/documentation/servicemanagement/smappservice;
+  sindresorhus/LaunchAtLogin-Modern, https://github.com/sindresorhus/LaunchAtLogin-Modern
+- Swift usage of the IOPM calls: dustinrue/ControlPlane, manaflow-ai/cmux, apple/security-pcc.
+  `NSApp.yieldActivation(to:)` with `activate(options:)`: jordanbaird/Ice, jacklandrin/OnlySwitch.
+
+### 10.2 Open uncertainties (check on hardware / in CI)
+
+| # | Item | Where | How to settle it |
+|---|---|---|---|
+| 1 | Pro Mk2 second-port labels and the API-key unlock (labels > 128) | §1.3, §1.6 | Test with a Mk2, or ask ENTTEC for the Mk2 API |
+| 2 | Whether DMXking 2-port units (ultraDMX Pro) treat label 6 as "port A only" | §1.3 | Test with the device. DMXking docs |
+| 3 | Open DMX USB break/MAB timing through Apple's FTDI dext (`TIOCSBRK`/`TIOCCBRK` granularity, RTS handling) | §1.8 | Logic analyser on the DMX line |
+| 4 | `VMIN=1` + `O_NONBLOCK` read behaviour, reasoned from XNU source and not run on hardware | §2.4 | Unplug/replug test with a real widget |
+| 5 | `IOSSDATALAT` honoured by the Apple FTDI dext | §2.6 | Measure reply latency to label 3 |
+| 6 | Art-Net 4 ArtPollReply fields after byte 212 (taken from the spec, not cross-checked in code) | §3.1 | Wireshark against a current node |
+| 7 | Whether Local Network permission survives updates when signed with a self-signed (non-Apple) certificate | §5.1 | Update test on macOS 15 and 26 |
+| 8 | `SMAppService` login items for ad-hoc-signed apps across updates | §9.2 | Update test. `sfltool dumpbtm` |
+| 9 | App Intents metadata with `swift build --build-system swiftbuild` | §4.10 | Try it in CI and look for `Metadata.appintents` |
+| 10 | Which Xcode/toolchain release makes `swiftbuild` the default build system | §4.3 | Swift release notes. The doc's advice doesn't depend on it |
+| 11 | `codesign` with an untrusted self-signed identity selected by SHA-1 on CI. `rcodesign` designated requirement | §4.7 | CI dry run plus `codesign -d -r-` |
+| 12 | "App Management" protection when the installer replaces an ad-hoc/self-signed bundle | §4.8 | Test the install script on macOS 15 and 26 |
+| 13 | SwiftUI external-event routing (`handlesExternalEvents`) for files and `prism://` URLs | §4.9 | Manual test |
+| 14 | Xcode 26 `actool` flags for `.icon` (Icon Composer) files | §4.6 | Not needed if you use `iconutil` |
+| 15 | SHA-256 of the extracted amd64 cloudflared binary (inferred by analogy with arm64) | §7.2 | Verify the **tgz** digest instead (that's what the code does) |
+| 16 | The old `config.yaml` quick-tunnel caveat. `--allowed-mail` with WebSockets. `--output json` keys | §7.1 | Manual test with cloudflared ≥ 2026.9.3 |
+| 17 | Deep link to System Settings › Privacy › Local Network | §5.1 | Manual test. Otherwise open Privacy & Security |
+| 18 | Hosted-runner display resolution for screenshots | §6.4 | `system_profiler SPDisplaysDataType` in CI |
+| 19 | Exact Swift version for each Xcode 26.x minor release | §6.1 | Run `swift --version` in CI |
+| 20 | Whether `NSBonjourServices` is enforced on macOS | §4.2 | Harmless either way |
+| 21 | Cooperative activation in `SingleInstance.enforce()` (may not bring the other copy forward) | §9.3 | Manual test. Cosmetic only |
