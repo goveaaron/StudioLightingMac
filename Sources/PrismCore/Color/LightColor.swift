@@ -10,7 +10,7 @@ public enum LightColor: Hashable, Sendable {
     /// sRGB color, exactly as typed in a hex code.
     case rgb(RGB)
     /// Correlated color temperature in Kelvin, plus tint: -1 = full green … 0 = neutral … +1 = full magenta.
-    case kelvin(Double, tint: Double)
+    case kelvin(Double, tint: Double = 0)
     /// Hue in degrees (0..<360) and saturation (0 = white at 5600K … 1 = fully saturated).
     case hsi(hue: Double, saturation: Double)
     /// CIE 1931 xy chromaticity.
@@ -19,9 +19,29 @@ public enum LightColor: Hashable, Sendable {
     public static let white: LightColor = .kelvin(5600, tint: 0)
     public static let daylight: LightColor = .kelvin(5600, tint: 0)
     public static let tungsten: LightColor = .kelvin(3200, tint: 0)
+    public static let candle: LightColor = .kelvin(1900, tint: 0)
+    public static let hmi: LightColor = .kelvin(5600, tint: 0)
+    public static let overcast: LightColor = .kelvin(6500, tint: 0)
+    public static let shade: LightColor = .kelvin(7500, tint: 0)
+    public static let goldenHour: LightColor = .kelvin(3500, tint: 0)
 
     public static func hex(_ string: String) -> LightColor? {
         RGB(hex: string).map { LightColor.rgb($0) }
+    }
+
+    /// Resolves a named color (CSS name, studio swatch, or real-source preset).
+    public static func named(_ name: String) -> LightColor? {
+        NamedColors.resolve(name)
+    }
+
+    /// Resolves a Rosco or LEE gel by code, number, or name on the given base CCT.
+    public static func gel(_ query: String, baseKelvin: Double = 5600, baseTint: Double = 0) -> LightColor? {
+        GelLibrary.find(query)?.color(baseKelvin: baseKelvin, baseTint: baseTint)
+    }
+
+    /// Resolves a real-source lighting preset by name or ID.
+    public static func sourcePreset(_ name: String) -> LightColor? {
+        NamedColors.sourcePreset(named: name)?.color
     }
 
     /// Normalized linear-light RGB at full brightness (max component = 1), sRGB primaries.
@@ -62,6 +82,12 @@ public enum LightColor: Hashable, Sendable {
         }
     }
 
+    /// sRGB representation of this color (exact stored value for `.rgb`, `displayRGB` otherwise).
+    public var sRGB: RGB {
+        if case .rgb(let c) = self { return c }
+        return displayRGB
+    }
+
     /// Hex code of `displayRGB` (for `.rgb` colors this is the exact stored hex).
     public var hex: String {
         if case .rgb(let c) = self { return c.hex }
@@ -82,6 +108,23 @@ public enum LightColor: Hashable, Sendable {
         if case .kelvin(let k, let t) = self { return (k, t) }
         let (x, y) = xy
         return ColorMath.xyToKelvinAndTint(x: x, y: y)
+    }
+
+    /// Signed CIE 1960 Duv offset from the Planckian locus (positive = greener, negative = magenta).
+    public var duv: Double {
+        if case .kelvin(_, let t) = self { return ColorMath.tintToDuv(t) }
+        let (x, y) = xy
+        return ColorMath.xyToKelvinAndDuv(x: x, y: y).duv
+    }
+
+    /// OKLab coordinates of `linearRGB`.
+    public var okLab: (L: Double, a: Double, b: Double) {
+        ColorMath.linearToOKLab(linearRGB)
+    }
+
+    /// OKLCh coordinates of `linearRGB`.
+    public var okLCh: (L: Double, C: Double, h: Double) {
+        ColorMath.linearToOKLCh(linearRGB)
     }
 
     /// True when the color is essentially a white (near the Planckian locus and desaturated).
@@ -120,7 +163,8 @@ public enum LightColor: Hashable, Sendable {
     }
 
     /// Perceptually smooth interpolation between two colors.
-    /// Kelvin↔Kelvin interpolates in mireds (so it stays on the white line); everything else in OKLab.
+    /// Kelvin↔Kelvin interpolates in mireds (so it stays on the white line); everything else
+    /// interpolates in OKLab with chroma restoration so fades between distant hues never dip through grey.
     public static func mix(_ a: LightColor, _ b: LightColor, _ t: Double) -> LightColor {
         let t = clamp01(t)
         if t <= 0 { return a }
@@ -129,9 +173,7 @@ public enum LightColor: Hashable, Sendable {
             let m = lerp(1e6 / max(k1, 1), 1e6 / max(k2, 1), t)
             return .kelvin(1e6 / max(m, 1), tint: lerp(t1, t2, t))
         }
-        let la = ColorMath.linearToOKLab(a.linearRGB)
-        let lb = ColorMath.linearToOKLab(b.linearRGB)
-        let mixed = ColorMath.okLabToLinear(L: lerp(la.L, lb.L, t), a: lerp(la.a, lb.a, t), b: lerp(la.b, lb.b, t))
+        let mixed = ColorMath.mixOKLab(a.linearRGB, b.linearRGB, t)
         return .rgb(RGB(linear: mixed.clamped.normalized))
     }
 }
