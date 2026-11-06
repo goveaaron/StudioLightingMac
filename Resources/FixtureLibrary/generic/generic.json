@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "id": "generic.dimmer",
+      "manufacturer": "Generic",
+      "model": "Dimmer",
+      "category": "dimmer",
+      "aliases": ["dimmer", "single channel", "1ch", "practical", "tungsten", "par can", "bulb"],
+      "source": "generic",
+      "notes": "Any light that only goes brighter/darker (one DMX channel).",
+      "addressHelp": "Set the light (or its dimmer pack) to the DMX address Prism shows.",
+      "modes": [
+        { "name": "8-bit", "shortName": "1ch", "summary": "Brightness only", "recommended": true,
+          "channels": ["intensity"] },
+        { "name": "16-bit", "shortName": "2ch", "summary": "Brightness only, extra-smooth fades",
+          "channels": ["intensity", { "kind": "intensity", "fine": true }] }
+      ]
+    },
+    {
+      "id": "generic.rgb",
+      "manufacturer": "Generic",
+      "model": "RGB Light",
+      "category": "par",
+      "aliases": ["rgb", "led par", "rgb par", "led wash"],
+      "source": "generic",
+      "modes": [
+        { "name": "RGB", "shortName": "3ch", "summary": "Color (red, green, blue)", "channels": ["red", "green", "blue"] },
+        { "name": "Dimmer + RGB", "shortName": "4ch", "summary": "Brightness + color", "recommended": true,
+          "channels": ["intensity", "red", "green", "blue"] },
+        { "name": "Dimmer + RGB + Strobe", "shortName": "5ch", "summary": "Brightness + color + strobe",
+          "channels": ["intensity", "red", "green", "blue",
+            { "kind": "strobe", "capabilities": [
+              { "range": [0, 9], "label": "No strobe", "tag": "off" },
+              { "range": [10, 255], "label": "Strobe slow → fast", "tag": "strobe", "physical": [1, 20] }
+            ] }] },
+        { "name": "RGB 16-bit", "shortName": "6ch", "summary": "Color, extra-smooth",
+          "channels": ["red", { "kind": "red", "fine": true }, "green", { "kind": "green", "fine": true }, "blue", { "kind": "blue", "fine": true }] }
+      ]
+    },
+    {
+      "id": "generic.rgbw",
+      "manufacturer": "Generic",
+      "model": "RGBW Light",
+      "category": "par",
+      "aliases": ["rgbw", "rgbw par"],
+      "source": "generic",
+      "cctRange": [3000, 6500],
+      "modes": [
+        { "name": "RGBW", "shortName": "4ch", "summary": "Color + white", "channels": ["red", "green", "blue", "white"] },
+        { "name": "Dimmer + RGBW", "shortName": "5ch", "summary": "Brightness + color + white", "recommended": true,
+          "channels": ["intensity", "red", "green", "blue", "white"] }
+      ]
+    },
+    {
+      "id": "generic.rgbww",
+      "manufacturer": "Generic",
+      "model": "RGBWW Light",
+      "category": "panel",
+      "aliases": ["rgbww", "rgbcw", "rgb + bicolor", "full color panel", "rgbacw"],
+      "source": "generic",
+      "cctRange": [2700, 6500],
+      "modes": [
+        { "name": "RGBWW", "shortName": "5ch", "summary": "Color + warm & cool white",
+          "channels": ["red", "green", "blue", "warmWhite", "coolWhite"] },
+        { "name": "Dimmer + RGBWW", "shortName": "6ch", "summary": "Brightness + color + warm & cool white", "recommended": true,
+          "channels": ["intensity", "red", "green", "blue", "warmWhite", "coolWhite"] },
+        { "name": "Dimmer + CCT + G/M + RGB + Crossfade", "shortName": "8ch",
+          "summary": "Exact white balance or full color, blendable",
+          "channels": ["intensity",
+            { "kind": "cct", "physical": [2700, 6500] },
+            { "kind": "tint", "physical": [-1, 1], "default": 128 },
+            "red", "green", "blue",
+            { "kind": "crossfade", "physical": [0, 1] },
+            "nothing"] }
+      ]
+    },
+    {
+      "id": "generic.rgba",
+      "manufacturer": "Generic",
+      "model": "RGBA / RGBAW+UV Light",
+      "category": "par",
+      "aliases": ["rgba", "rgbaw", "rgbawuv", "hex par", "6 in 1"],
+      "source": "generic",
+      "modes": [
+        { "name": "RGBA", "shortName": "4ch", "channels": ["red", "green", "blue", "amber"] },
+        { "name": "Dimmer + RGBAW + UV", "shortName": "7ch", "recommended": true,
+          "summary": "Brightness + rich color (amber, white, UV)",
+          "channels": ["intensity", "red", "green", "blue", "amber", "white", "uv"] }
+      ]
+    },
+    {
+      "id": "generic.bicolor",
+      "manufacturer": "Generic",
+      "model": "Bi-Color White Light",
+      "category": "panel",
+      "aliases": ["bicolor", "bi-color", "cct", "tunable white", "daylight tungsten", "led panel"],
+      "source": "generic",
+      "cctRange": [2700, 6500],
+      "modes": [
+        { "name": "Dimmer + CCT", "shortName": "2ch", "summary": "Brightness + white balance", "recommended": true,
+          "channels": ["intensity", { "kind": "cct", "physical": [2700, 6500] }] },
+        { "name": "Dimmer + CCT + G/M", "shortName": "3ch", "summary": "Brightness + white balance + green/magenta tint",
+          "channels": ["intensity", { "kind": "cct", "physical": [2700, 6500] }, { "kind": "tint", "physical": [-1, 1], "default": 128 }] },
+        { "name": "Warm + Cool", "shortName": "2ch", "summary": "Separate warm and cool LEDs",
+          "channels": ["warmWhite", "coolWhite"] },
+        { "name": "Dimmer + Warm + Cool", "shortName": "3ch",
+          "channels": ["intensity", "warmWhite", "coolWhite"] },
+        { "name": "16-bit Dimmer + CCT", "shortName": "4ch",
+          "channels": ["intensity", { "kind": "intensity", "fine": true }, { "kind": "cct", "physical": [2700, 6500] }, { "kind": "cct", "fine": true }] }
+      ]
+    },
+    {
+      "id": "generic.pixel-tube",
+      "manufacturer": "Generic",
+      "model": "Pixel Tube / Bar",
+      "category": "tube",
+      "aliases": ["pixel tube", "pixel bar", "led tube", "led bar", "batten", "pixel strip", "tube light"],
+      "source": "generic",
+      "physical": { "lengthMM": 1200, "diameterMM": 30 },
+      "cctRange": [2700, 6500],
+      "modes": [
+        { "name": "Dimmer + RGB (whole tube)", "shortName": "4ch", "summary": "One color for the whole tube",
+          "channels": ["intensity", "red", "green", "blue"] },
+        { "name": "Dimmer + 16 × RGB", "shortName": "49ch", "summary": "16 individually colored pixels", "recommended": true,
+          "channels": ["intensity"],
+          "pixels": { "count": 16, "channels": ["red", "green", "blue"] } },
+        { "name": "16 × RGB", "shortName": "48ch", "summary": "16 pixels, no master dimmer",
+          "pixels": { "count": 16, "channels": ["red", "green", "blue"] } },
+        { "name": "Dimmer + 8 × RGBW", "shortName": "33ch", "summary": "8 pixels with white",
+          "channels": ["intensity"],
+          "pixels": { "count": 8, "channels": ["red", "green", "blue", "white"] } },
+        { "name": "16 × RGBWW", "shortName": "80ch", "summary": "16 pixels with warm & cool white",
+          "pixels": { "count": 16, "channels": ["red", "green", "blue", "warmWhite", "coolWhite"] } }
+      ]
+    },
+    {
+      "id": "generic.hsi",
+      "manufacturer": "Generic",
+      "model": "HSI Light",
+      "category": "panel",
+      "aliases": ["hsi", "hue saturation intensity"],
+      "source": "generic",
+      "modes": [
+        { "name": "Dimmer + Hue + Saturation", "shortName": "3ch", "recommended": true,
+          "summary": "Brightness + hue + saturation",
+          "channels": ["intensity", { "kind": "hue", "physical": [0, 360] }, { "kind": "saturation", "physical": [0, 1] }] }
+      ]
+    }
+  ]
+}

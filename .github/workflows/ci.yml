@@ -1,0 +1,137 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish a GitHub release from this commit
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  PRISM_VERSION: 0.9.${{ github.run_number }}
+  PRISM_BUILD: ${{ github.run_number }}
+
+jobs:
+  linux:
+    name: Linux · core + server
+    runs-on: ubuntu-latest
+    container: swift:6.3
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: .build
+          key: linux-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: linux-spm-${{ hashFiles('Package.resolved') }}-
+      - name: Build
+        run: swift build --build-tests
+      - name: Test
+        run: swift test --skip-build
+
+  macos:
+    name: macOS · app
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          if [ -d /Applications/Xcode_26.6.app ]; then sudo xcode-select -s /Applications/Xcode_26.6.app; fi
+          swift --version
+          sw_vers
+      - uses: actions/cache@v4
+        with:
+          path: .build
+          key: macos-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: macos-spm-${{ hashFiles('Package.resolved') }}-
+      - name: Build (debug + tests)
+        run: swift build --build-tests
+      - name: Unit tests
+        run: swift test --skip-build
+      - name: Bundle app
+        run: scripts/build_app.sh --version "$PRISM_VERSION" --build "$PRISM_BUILD"
+      - name: Self-test
+        run: scripts/mac-timeout.sh 300 dist/Prism.app/Contents/MacOS/Prism --self-test
+      - name: Screenshot tour
+        if: success() || failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          scripts/mac-timeout.sh 900 dist/Prism.app/Contents/MacOS/Prism --screenshot-tour "$RUNNER_TEMP/shots"
+      - name: Full-screen capture
+        if: success() || failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          dist/Prism.app/Contents/MacOS/Prism --demo --no-hardware > "$RUNNER_TEMP/shots/zz-launch.log" 2>&1 &
+          PID=$!
+          sleep 15
+          screencapture -x "$RUNNER_TEMP/shots/zz-fullscreen.png" || true
+          kill -TERM $PID 2>/dev/null || true
+          sleep 2
+          kill -KILL $PID 2>/dev/null || true
+      - name: Crash reports
+        if: failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots/crashes"
+          find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name 'Prism*' -mmin -90 2>/dev/null | while read -r f; do
+            cp "$f" "$RUNNER_TEMP/shots/crashes/" || true
+            echo "===== $f"; head -c 12000 "$f"; echo
+          done
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: screenshots
+          path: ${{ runner.temp }}/shots
+          retention-days: 10
+          if-no-files-found: ignore
+
+  release:
+    name: Release
+    needs: [linux, macos]
+    if: github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[release]') || inputs.release)
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          if [ -d /Applications/Xcode_26.6.app ]; then sudo xcode-select -s /Applications/Xcode_26.6.app; fi
+          swift --version
+      - uses: actions/cache/restore@v4
+        with:
+          path: .build
+          key: macos-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+          restore-keys: macos-spm-${{ hashFiles('Package.resolved') }}-
+      - name: Build universal release
+        run: scripts/build_app.sh --release --universal --version "$PRISM_VERSION" --build "$PRISM_BUILD"
+      - name: Self-test (release build)
+        run: scripts/mac-timeout.sh 300 dist/Prism.app/Contents/MacOS/Prism --self-test
+      - name: Package
+        run: |
+          cd dist
+          ditto -c -k --sequesterRsrc --keepParent Prism.app Prism.zip
+          shasum -a 256 Prism.zip | tee Prism.zip.sha256
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v$PRISM_VERSION" dist/Prism.zip dist/Prism.zip.sha256 \
+            --target "$GITHUB_SHA" --latest \
+            --title "Prism $PRISM_VERSION" \
+            --notes "Install or update on your Mac by pasting this into Terminal:
+
+          \`\`\`
+          curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | bash
+          \`\`\`
+
+          Universal app (Apple silicon + Intel), macOS 14 Sonoma or newer."
