@@ -2,7 +2,7 @@ import Foundation
 
 /// An sRGB color with gamma-encoded components in 0...1 — exactly what a hex code like
 /// `#00CED1` describes. This is the user-facing color representation.
-public struct RGBColor: Codable, Hashable, Sendable {
+public struct RGB: Codable, Hashable, Sendable {
     public var r: Double
     public var g: Double
     public var b: Double
@@ -17,11 +17,11 @@ public struct RGBColor: Codable, Hashable, Sendable {
         self.init(r: Double(r255) / 255, g: Double(g255) / 255, b: Double(b255) / 255)
     }
 
-    public static let white = RGBColor(r: 1, g: 1, b: 1)
-    public static let black = RGBColor(r: 0, g: 0, b: 0)
-    public static let red = RGBColor(r: 1, g: 0, b: 0)
-    public static let green = RGBColor(r: 0, g: 1, b: 0)
-    public static let blue = RGBColor(r: 0, g: 0, b: 1)
+    public static let white = RGB(r: 1, g: 1, b: 1)
+    public static let black = RGB(r: 0, g: 0, b: 0)
+    public static let red = RGB(r: 1, g: 0, b: 0)
+    public static let green = RGB(r: 0, g: 1, b: 0)
+    public static let blue = RGB(r: 0, g: 0, b: 1)
 
     // MARK: Hex
 

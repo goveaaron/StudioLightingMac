@@ -1947,3 +1947,745 @@ enum LANAddresses {
   with a "can't connect?" hint that offers the Cloudflare tunnel (§7).
 
 ---
+
+## 6. GitHub Actions (macOS runners)
+
+### 6.1 Runner labels and Xcode ✅ (actions/runner-images README and image readmes, images 20261026/20261028)
+
+| Label | Arch | OS | Xcode installed | Notes |
+|---|---|---|---|---|
+| `macos-latest`, `macos-26`, `macos-26-xlarge` | arm64 (M1 3-core; xlarge = bigger, billed) | macOS 26.6.2 | 26.0.1, 26.1.1, 26.2, 26.3, 26.4.1, 26.5, **26.6 (default)** | **Recommended** |
+| `macos-26-intel`, `macos-26-large`, `macos-latest-large` | x64 | macOS 26 | 26.x | `-large` is billed |
+| `macos-15`, `macos-15-xlarge` | arm64 | macOS 15.8.2 | 16.0–16.4 (**16.4 default**), 26.0.1–26.3 | |
+| `macos-15-intel`, `macos-15-large` | x64 | macOS 15 | same | Intel images supported until about Aug 2027 |
+| `xcode-27`, `xcode-27-xlarge` | arm64 | macOS 27.0.1 | Xcode 27 (preview) | New label style; preview, may change |
+| `macos-14` | — | — | — | **Retired from GitHub Actions on 2 Nov 2026** |
+
+- Image policy: **one Xcode major version per macOS image**. All minor versions of it are present, and
+  a new patch release replaces the previous one. So pin a minor version you know exists and update
+  it when the image changes. Check `xcodebuild -version` / `swift --version` in the log. Xcode 26.x
+  ships Swift 6.2–6.3 ⚠️ (Swift version per Xcode minor not listed in the readme).
+- **Selecting Xcode:** set the `DEVELOPER_DIR` env var (`/Applications/Xcode_26.6.app/Contents/Developer`;
+  per step or job, no sudo), or run `sudo xcode-select -s /Applications/Xcode_26.6.app` (passwordless
+  sudo works on hosted runners). `maxim-lobanov/setup-xcode@v1.7.0` (`xcode-version: '26.6'`) does
+  the same.
+- `macos-latest` moves gradually (over 1–2 months) when a new OS becomes "latest". Use **`macos-26`**
+  for reproducible builds.
+- The macOS 26 image is switching its **default OpenSSL from 3 to 4** (runner-images issue #14856).
+  This matters only if you script `openssl pkcs12` (§4.7).
+- Current action versions (Nov 2026): `actions/checkout@v7` (7.0.1), `actions/cache@v6` (6.1.0),
+  `actions/upload-artifact@v7` (7.0.2), `actions/download-artifact@v8` (8.0.2),
+  `softprops/action-gh-release@v3` (3.0.4). `gh` 2.103 is preinstalled on all images.
+
+### 6.2 Limits and billing ✅ (GitHub docs, "Actions limits" / billing)
+
+- **Public repo + standard GitHub-hosted runners = free, unlimited minutes.** Larger runners
+  (`-large`, `-xlarge`) are always billed.
+- Concurrency (Free plan): **20 concurrent jobs, at most 5 of them macOS**. Job timeout **6 h**.
+  Use `concurrency:` to cancel superseded PR runs.
+- Cache: **10 GB per repo** (least recently used entries are evicted). Artifacts and logs: default
+  retention 90 days. Storage quotas apply to private repos only.
+
+### 6.3 Workflow: test, bundle, upload, release on tag ✅
+
+```yaml
+# .github/workflows/build.yml
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      HAS_SIGNING_CERT: ${{ secrets.SIGNING_P12_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Cache SwiftPM build
+        uses: actions/cache@v6
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ runner.arch }}-xcode26.6-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            spm-${{ runner.os }}-${{ runner.arch }}-xcode26.6-
+
+      - name: Test
+        run: swift test --parallel
+
+      - name: Version
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then V="${GITHUB_REF_NAME#v}"; else V="0.0.${GITHUB_RUN_NUMBER}"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      # Optional stable signing identity (§4.7). Leave the secrets unset to fall back to ad-hoc.
+      - name: Import signing certificate
+        if: env.HAS_SIGNING_CERT == 'true'
+        env:
+          SIGNING_P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}
+          SIGNING_P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/signing.keychain-db"; KC_PW="$(uuidgen)"
+          echo "$SIGNING_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KC_PW" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KC_PW" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$SIGNING_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PW" "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          HASH="$(security find-identity -p codesigning "$KC" | awk '/Prism Code Signing/ {print $2; exit}')"
+          echo "SIGN_IDENTITY=$HASH" >> "$GITHUB_ENV"
+
+      - name: Bundle
+        run: scripts/bundle-app.sh "${{ steps.ver.outputs.version }}" "$GITHUB_RUN_NUMBER"
+
+      - name: Smoke test + screenshot
+        run: |
+          # Launch the binary directly: it inherits the runner agent's TCC grants (see 6.4).
+          PRISM_CI_DEMO=1 ./dist/Prism.app/Contents/MacOS/Prism &
+          APP_PID=$!
+          sleep 10
+          kill -0 "$APP_PID"                    # fails the step if the app crashed on launch
+          screencapture -x dist/screenshot.png
+          kill "$APP_PID" || true
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Prism-${{ steps.ver.outputs.version }}
+          path: |
+            dist/Prism.zip
+            dist/Prism.zip.sha256
+            dist/screenshot.png
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest            # no need to spend a macOS slot on uploading
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/Prism.zip dist/Prism.zip.sha256 \
+            --repo "$GITHUB_REPOSITORY" --title "Prism ${GITHUB_REF_NAME#v}" \
+            --generate-notes --verify-tag
+```
+
+Notes:
+- Secrets can't be used directly in `if:`. The job-level `HAS_SIGNING_CERT` flag
+  (`${{ secrets.X != '' }}`; the `secrets` context *is* allowed in `jobs.<id>.env`) evaluates to the
+  string `'true'`/`'false'`, and the step tests that. The secrets themselves are only exposed to
+  that one step.
+- Caching `.build` saves the SwiftNIO compile (several minutes). Keep the Xcode version in the key,
+  because module caches from another compiler cause odd errors. If a cached build ever misbehaves,
+  bump the key prefix.
+- Pre-release tags (`v1.2.0-beta.1`): add `--prerelease`. `releases/latest/download/…` (used by the
+  installer) skips pre-releases.
+- `softprops/action-gh-release@v3` is an alternative to the `gh` command; both need
+  `contents: write`.
+
+### 6.4 GUI apps and screenshots on hosted runners ✅ (runner-images `configure-tccdb-macos.sh`)
+
+- Hosted macOS runners run a logged-in GUI session. The image pre-populates the TCC database with
+  **Screen Capture** for `/bin/bash`, the runner agent (`hosted-compute-agent`/provisioner),
+  Terminal and `osascript`. It also pre-approves `replayd`. So **`screencapture -x file.png` works**
+  from a `run:` step.
+- The agent/provisioner also hold the **Microphone** grant. A binary started **directly** from a step
+  is attributed to the agent (its responsible process) and inherits these grants. Starting it with
+  **`open Prism.app`** makes Prism its own responsible process, so any TCC prompt (camera, mic,
+  speech, Local Network) appears and **blocks forever** with nobody to click it. Add a CI/demo mode
+  (`PRISM_CI_DEMO=1`) that touches no protected resources.
+- Expect a small default display resolution ⚠️. Size the window to fit, or capture a window with
+  `screencapture -l <windowID>`.
+
+---
+
+## 7. Cloudflare quick tunnels (and alternatives)
+
+### 7.1 Facts ✅ (Cloudflare "Quick Tunnels" docs, updated 2026-09-30; cloudflared release 2026.10.7)
+
+- Command: `cloudflared tunnel --url http://127.0.0.1:8787 --no-autoupdate`. **No Cloudflare account
+  and no login needed.** It prints a random `https://<words>.trycloudflare.com` URL. The hostname
+  **changes on every run**.
+- **WebSockets work** through quick tunnels (Cloudflare proxies the upgrade). **Server-Sent Events
+  are not supported**, so the remote must use WebSockets or polling. There is a limit of about **200
+  in-flight requests** (HTTP 429 beyond that), no uptime guarantee, and Cloudflare positions it for
+  testing/development.
+- Quick tunnels don't work when `~/.cloudflared/config.yaml` exists (documented caveat ⚠️ wording).
+  Detect that file and warn the user.
+- cloudflared tries QUIC (UDP 7844) first and falls back to HTTP/2 (TCP 7844). On networks that block
+  this, add `--protocol http2`.
+- The tunnel is **public**. Anyone who learns the URL can reach the server, so always require the
+  random token (§5.2).
+
+### 7.2 Downloads and checksums ✅ (verified by downloading the arm64 asset)
+
+Latest release **2026.10.7** (2026-10-30). Asset URL pattern:
+`https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/<asset>`
+
+| Asset | SHA-256 of the **.tgz** (GitHub asset digest) | SHA-256 listed in the release notes (= the extracted **binary**) |
+|---|---|---|
+| `cloudflared-darwin-arm64.tgz` | `3586ccf397e98e5f437e60e7c307ca6ac463e110580503af8bb8e6f9ebf831bd` ✅ | `2136431d5eb467bf447d2ee514b713e192719b143aec1d9e09bf7dc290d5bb12` ✅ |
+| `cloudflared-darwin-amd64.tgz` | `02f3edfd87684dd5b705607688e4eb4b323f6e777b81e7b3a85af556aa356848` | `5c55e77da7012cebca19170357e196176c48c9647cc2ead404702fa125ddbd86` ⚠️ (by analogy) |
+
+> [!WARNING]
+> The release notes' "SHA256 Checksums" section labels its values `cloudflared-darwin-arm64.tgz: …`,
+> but **those values are the hash of the `cloudflared` binary inside the archive, not of the .tgz**
+> (checked: the downloaded tgz hashes to `3586cc…`, and the extracted binary to `2136431…`).
+> Verify the archive against the GitHub asset digest (`gh api repos/cloudflare/cloudflared/releases/tags/2026.10.7`
+> → `assets[].digest`) **or** verify the extracted binary against the release-notes value.
+
+- The archive holds a single file, `cloudflared` (Mach-O arm64, 39.5 MB, mode 755) ✅. The binary has
+  an embedded Apple certificate chain, so it is codesigned (presumably Developer ID ⚠️).
+- `.pkg` installers and Homebrew (`brew install cloudflared`) also exist. For an app, download on
+  demand into `~/Library/Application Support/Prism/bin/` instead of bundling 40 MB per arch.
+  URLSession downloads from a non-sandboxed app get **no quarantine xattr** unless the app sets
+  `LSFileQuarantineEnabled`, so the binary runs without Gatekeeper prompts.
+
+```bash
+# Shell (CI or the installer script)
+V=2026.10.7
+case "$(uname -m)" in
+  arm64)  A=arm64; SHA=3586ccf397e98e5f437e60e7c307ca6ac463e110580503af8bb8e6f9ebf831bd ;;
+  x86_64) A=amd64; SHA=02f3edfd87684dd5b705607688e4eb4b323f6e777b81e7b3a85af556aa356848 ;;
+esac
+curl -fL -o cloudflared.tgz "https://github.com/cloudflare/cloudflared/releases/download/$V/cloudflared-darwin-$A.tgz"
+echo "$SHA  cloudflared.tgz" | shasum -a 256 -c -
+tar -xzf cloudflared.tgz && chmod +x cloudflared && ./cloudflared --version
+```
+
+### 7.3 Swift: installer + tunnel runner ✅ (Foundation `Process`, CryptoKit)
+
+```swift
+import Foundation
+import CryptoKit
+
+enum CloudflaredInstaller {
+    static let version = "2026.10.7"
+    #if arch(arm64)
+    static let asset = "cloudflared-darwin-arm64.tgz"
+    static let tgzSHA256 = "3586ccf397e98e5f437e60e7c307ca6ac463e110580503af8bb8e6f9ebf831bd"
+    #else
+    static let asset = "cloudflared-darwin-amd64.tgz"
+    static let tgzSHA256 = "02f3edfd87684dd5b705607688e4eb4b323f6e777b81e7b3a85af556aa356848"
+    #endif
+
+    static var binaryURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Prism/bin/cloudflared")
+    }
+
+    /// Downloads, verifies and unpacks cloudflared (if needed). Returns the executable URL.
+    static func ensureInstalled() async throws -> URL {
+        let fm = FileManager.default
+        if fm.isExecutableFile(atPath: binaryURL.path) { return binaryURL }
+        let url = URL(string: "https://github.com/cloudflare/cloudflared/releases/download/\(version)/\(asset)")!
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        guard digest == tgzSHA256 else { throw URLError(.cannotDecodeContentData) }
+
+        let dir = binaryURL.deletingLastPathComponent()
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let tgz = dir.appendingPathComponent(asset)
+        try data.write(to: tgz, options: .atomic)
+        defer { try? fm.removeItem(at: tgz) }
+
+        let tar = Process()
+        tar.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+        tar.arguments = ["-xzf", tgz.path, "-C", dir.path]
+        try tar.run()
+        tar.waitUntilExit()
+        guard tar.terminationStatus == 0, fm.isExecutableFile(atPath: binaryURL.path) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return binaryURL
+    }
+}
+
+/// Runs a quick tunnel to the local remote-control server and reports its public URL.
+final class QuickTunnel: @unchecked Sendable {
+    enum Event: Sendable { case starting, ready(URL), exited(Int32) }
+    var onEvent: (@Sendable (Event) -> Void)?
+
+    private let lock = NSLock()
+    private var process: Process?
+    private var log = ""
+    private var announced = false
+
+    func start(cloudflared: URL, localPort: UInt16) throws {
+        stop()
+        let p = Process()
+        p.executableURL = cloudflared
+        p.arguments = ["tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:\(localPort)"]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = pipe                                  // banner + logs go to stderr
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            if data.isEmpty { handle.readabilityHandler = nil; return }       // EOF
+            self?.consume(String(decoding: data, as: UTF8.self))
+        }
+        p.terminationHandler = { [weak self] proc in self?.onEvent?(.exited(proc.terminationStatus)) }
+        lock.lock(); process = p; log = ""; announced = false; lock.unlock()
+        onEvent?(.starting)
+        try p.run()
+    }
+
+    /// Call from applicationWillTerminate too: a child process outlives a crashed parent.
+    func stop() {
+        lock.lock(); let p = process; process = nil; lock.unlock()
+        guard let p, p.isRunning else { return }
+        p.terminationHandler = nil
+        p.terminate()                                           // SIGTERM → graceful shutdown
+    }
+
+    private func consume(_ chunk: String) {
+        lock.lock()
+        log += chunk
+        if log.count > 100_000 { log = String(log.suffix(20_000)) }
+        let text = log
+        let already = announced
+        lock.unlock()
+        guard !already else { return }
+        // The URL is printed first; it becomes reachable after "Registered tunnel connection".
+        // Skip api.trycloudflare.com, which appears in error messages.
+        let pattern = #"https://(?!api\.)[a-z0-9-]+\.trycloudflare\.com"#
+        guard let r = text.range(of: pattern, options: .regularExpression),
+              text.contains("Registered tunnel connection"),
+              let url = URL(string: String(text[r])) else { return }
+        lock.lock(); announced = true; lock.unlock()
+        onEvent?(.ready(url))
+    }
+}
+```
+
+Operational notes:
+- Bind the NIO server to 127.0.0.1 when only the tunnel is used (no firewall prompt, §5.2). The
+  tunnel's loopback connection isn't subject to Local Network privacy, and the outbound connection to
+  Cloudflare is Internet traffic.
+- Orphans: if Prism crashes, `cloudflared` keeps running. Save the child PID in `UserDefaults`. On the
+  next launch, check it with `proc_pidpath` (must be our binary path) and send `kill(pid, SIGTERM)`.
+- The URL changes each run, so regenerate the QR code on every `.ready`. DNS for a new hostname can
+  take a few seconds to propagate even after `ready`. Let the phone retry.
+- Logs use `INF`/`ERR` prefixes. Show the last lines in a "Tunnel log" sheet for support.
+
+### 7.4 Alternatives (brief)
+
+| Option | Account | Notes |
+|---|---|---|
+| **Tailscale Funnel** | Tailscale account and the app on the Mac | `tailscale funnel 8787`. Stable `https://<machine>.<tailnet>.ts.net` URL, public ports 443/8443/10000 only. Better for repeat users |
+| **ngrok** | Account and authtoken required | Free tier shows a browser interstitial (skip it with the `ngrok-skip-browser-warning` header, not possible from a QR scan) and includes one static domain |
+| **Cloudflare named tunnel** | Free account plus your own domain | Stable hostname, no 200-request limit. More setup (login, DNS) |
+| LAN only | none | Default. QR with the LAN IP (§5.4) |
+
+---
+
+## 8. CoreMIDI and OSC
+
+### 8.1 CoreMIDI with the UMP API (macOS 11+) ✅ (signatures from the CoreMIDI Swift interface; patterns from AudioKit, MorkAndMIDI, Hammerspoon2)
+
+- `MIDIClientCreateWithBlock` delivers notifications (e.g. `.msgSetupChanged` when devices come or
+  go) **on the run loop that was current when the client was created**. Create the client on the
+  **main thread**. If you create it on a GCD worker without a run loop, the notifications never
+  arrive.
+- `MIDIInputPortCreateWithProtocol(…, ._1_0, …)` hands you a `MIDIEventList` of **Universal MIDI
+  Packets** on a **high-priority CoreMIDI thread**. Decode quickly and hop to your own queue or actor.
+  Asking for protocol `._1_0` gives MIDI 1.0 channel-voice messages as UMP type 0x2 (one 32-bit word
+  each).
+- The legacy `MIDIInputPortCreateWithBlock` / `MIDIPacketList` / `MIDISend` API still works but is
+  slated for deprecation. Don't start new code on it.
+
+```swift
+import CoreMIDI
+import Foundation
+
+enum MIDIMessage: Equatable, Sendable {
+    case noteOn(channel: UInt8, note: UInt8, velocity: UInt8)
+    case noteOff(channel: UInt8, note: UInt8, velocity: UInt8)
+    case controlChange(channel: UInt8, controller: UInt8, value: UInt8)
+    case programChange(channel: UInt8, program: UInt8)
+    case pitchBend(channel: UInt8, value: UInt16)              // 0…16383, centre 8192
+    case clock, start, resume, stop                            // 0xF8, 0xFA, 0xFB (Continue), 0xFC
+
+    /// Decodes the first word of a UMP message: type 0x2 (MIDI 1.0 channel voice) or 0x1 (system).
+    static func decode(_ w: UInt32) -> MIDIMessage? {
+        switch w >> 28 {
+        case 0x2:
+            let status = UInt8((w >> 16) & 0xF0), ch = UInt8((w >> 16) & 0x0F)
+            let d1 = UInt8((w >> 8) & 0x7F), d2 = UInt8(w & 0x7F)
+            switch status {
+            case 0x80: return .noteOff(channel: ch, note: d1, velocity: d2)
+            case 0x90: return d2 == 0 ? .noteOff(channel: ch, note: d1, velocity: 0)
+                                      : .noteOn(channel: ch, note: d1, velocity: d2)
+            case 0xB0: return .controlChange(channel: ch, controller: d1, value: d2)
+            case 0xC0: return .programChange(channel: ch, program: d1)
+            case 0xE0: return .pitchBend(channel: ch, value: UInt16(d2) << 7 | UInt16(d1))
+            default:   return nil
+            }
+        case 0x1:
+            switch (w >> 16) & 0xFF {
+            case 0xF8: return .clock
+            case 0xFA: return .start
+            case 0xFB: return .resume
+            case 0xFC: return .stop
+            default:   return nil
+            }
+        default:
+            return nil
+        }
+    }
+
+    /// One UMP word (group 0) for sending, e.g. LED feedback.
+    var umpWord: UInt32? {
+        func cv(_ status: UInt8, _ ch: UInt8, _ d1: UInt8, _ d2: UInt8) -> UInt32 {
+            0x2000_0000 | UInt32(status | (ch & 0x0F)) << 16 | UInt32(d1 & 0x7F) << 8 | UInt32(d2 & 0x7F)
+        }
+        switch self {
+        case let .noteOn(c, n, v):         return cv(0x90, c, n, v)
+        case let .noteOff(c, n, v):        return cv(0x80, c, n, v)
+        case let .controlChange(c, cc, v): return cv(0xB0, c, cc, v)
+        case let .programChange(c, p):     return cv(0xC0, c, p, 0)
+        case let .pitchBend(c, v):         return cv(0xE0, c, UInt8(v & 0x7F), UInt8((v >> 7) & 0x7F))
+        default:                           return nil
+        }
+    }
+}
+
+struct MIDIError: Error { let status: OSStatus }
+
+/// Create and start on the main thread.
+final class MIDIManager: @unchecked Sendable {
+    /// Called on CoreMIDI's receive thread with the source endpoint the message came from.
+    var onMessage: (@Sendable (MIDIMessage, MIDIEndpointRef) -> Void)?
+
+    private var client = MIDIClientRef()
+    private var inputPort = MIDIPortRef()
+    private var outputPort = MIDIPortRef()
+    private var connected = Set<MIDIEndpointRef>()            // main-thread only
+
+    func start() throws {
+        var status = MIDIClientCreateWithBlock("Prism" as CFString, &client) { [weak self] notification in
+            if notification.pointee.messageID == .msgSetupChanged { self?.connectAllSources() }
+        }
+        guard status == noErr else { throw MIDIError(status: status) }
+
+        status = MIDIInputPortCreateWithProtocol(client, "Prism Input" as CFString, ._1_0, &inputPort) {
+            [weak self] eventList, srcConnRefCon in
+            let source = MIDIEndpointRef(truncatingIfNeeded: UInt(bitPattern: srcConnRefCon))
+            self?.receive(eventList, from: source)
+        }
+        guard status == noErr else { throw MIDIError(status: status) }
+
+        status = MIDIOutputPortCreate(client, "Prism Output" as CFString, &outputPort)
+        guard status == noErr else { throw MIDIError(status: status) }
+        connectAllSources()
+    }
+
+    func stop() {
+        if inputPort != 0 { MIDIPortDispose(inputPort); inputPort = 0 }
+        if outputPort != 0 { MIDIPortDispose(outputPort); outputPort = 0 }
+        if client != 0 { MIDIClientDispose(client); client = 0 }
+        connected.removeAll()
+    }
+
+    /// Connects every source (call again on .msgSetupChanged). The endpoint ref doubles as refCon.
+    func connectAllSources() {
+        var current = Set<MIDIEndpointRef>()
+        for i in 0..<MIDIGetNumberOfSources() {
+            let src = MIDIGetSource(i)
+            guard src != 0 else { continue }
+            current.insert(src)
+            if !connected.contains(src) {
+                MIDIPortConnectSource(inputPort, src, UnsafeMutableRawPointer(bitPattern: UInt(src)))
+            }
+        }
+        for gone in connected.subtracting(current) { MIDIPortDisconnectSource(inputPort, gone) }
+        connected = current
+    }
+
+    private func receive(_ list: UnsafePointer<MIDIEventList>, from source: MIDIEndpointRef) {
+        for packet in list.unsafeSequence() {                  // UnsafePointer<MIDIEventPacket>
+            let words = MIDIEventPacket.WordCollection(packet)  // honours packet.wordCount
+            var i = words.startIndex
+            while i < words.endIndex {
+                let w = words[i]
+                if let m = MIDIMessage.decode(w) { onMessage?(m, source) }
+                // Step over multi-word UMP messages (SysEx, MIDI 2.0, …) by message type.
+                i = words.index(i, offsetBy: Self.umpWordCount(w >> 28), limitedBy: words.endIndex) ?? words.endIndex
+            }
+        }
+    }
+
+    static func umpWordCount(_ messageType: UInt32) -> Int {
+        switch messageType {
+        case 0x0, 0x1, 0x2, 0x6, 0x7: return 1
+        case 0x3, 0x4, 0x8, 0x9, 0xA: return 2
+        case 0xB, 0xC:                return 3
+        default:                      return 4                 // 0x5, 0xD, 0xE, 0xF
+        }
+    }
+
+    // MARK: Output (controller LED feedback)
+
+    func send(_ message: MIDIMessage, to destination: MIDIEndpointRef) {
+        guard let word = message.umpWord else { return }
+        send(words: [word], to: destination)
+    }
+
+    func send(words: [UInt32], to destination: MIDIEndpointRef) {
+        let builder = MIDIEventList.Builder(inProtocol: ._1_0, wordSize: 64)
+        builder.append(timestamp: 0, words: words)             // timestamp 0 = now
+        _ = builder.withUnsafePointer { MIDISendEventList(outputPort, destination, $0) }
+    }
+
+    // MARK: Endpoint info
+
+    static func destinations() -> [(ref: MIDIEndpointRef, name: String)] {
+        (0..<MIDIGetNumberOfDestinations()).map { i in
+            let d = MIDIGetDestination(i)
+            return (d, displayName(d))
+        }
+    }
+
+    static func displayName(_ obj: MIDIObjectRef) -> String {
+        var name: Unmanaged<CFString>?
+        guard MIDIObjectGetStringProperty(obj, kMIDIPropertyDisplayName, &name) == noErr, let name else { return "?" }
+        return name.takeRetainedValue() as String
+    }
+
+    /// Persist this (not the endpoint ref or name) to remember the user's controller.
+    static func uniqueID(_ obj: MIDIObjectRef) -> MIDIUniqueID {
+        var id: MIDIUniqueID = 0
+        MIDIObjectGetIntegerProperty(obj, kMIDIPropertyUniqueID, &id)
+        return id
+    }
+}
+```
+
+Notes:
+- A controller's input and output endpoints belong to the same **entity**. Pair them with
+  `MIDIEndpointGetEntity(endpoint, &entity)` so feedback goes to the device that sent the message.
+  Look endpoints up again later with `MIDIObjectFindByUniqueID(id, &object, &type)`.
+- C-API alternative to `MIDIEventList.Builder`: allocate a `MIDIEventList`, call
+  `MIDIEventListInit(listPtr, ._1_0)` → `MIDIEventListAdd(listPtr, MemoryLayout<MIDIEventList>.size, packet, 0, words.count, wordsPtr)`
+  → `MIDISendEventList(port, dest, listPtr)`. Use `withUnsafeMutablePointer` and never let the pointer
+  escape the closure.
+- Throttle LED feedback (≤ ~100 messages per refresh). Many controllers drop messages when flooded
+  over USB.
+
+### 8.2 OSC 1.0/1.1 over UDP ✅ (OSC 1.0 spec + 1.1 type tags)
+
+Encoding rules:
+- **OSC-string**: UTF-8/ASCII bytes, a terminating NUL, then NUL padding up to a multiple of 4 bytes.
+- **Message**: address (`/prism/fader/1`), then a type-tag string starting with `,`, then the
+  arguments. Every element is 4-byte aligned and all numbers are **big-endian**.
+- Types: `i` int32, `f` float32, `s` string, `b` blob (int32 size + bytes + pad), `h` int64,
+  `d` float64. These carry no data: `T` true, `F` false, `N` nil, `I` impulse.
+- **Bundle**: `"#bundle\0"`, then an 8-byte NTP time tag (`1` = immediately), then repeated
+  (int32 size + element), where each element is a message or another bundle.
+
+```swift
+import Foundation
+
+enum OSCArgument: Equatable, Sendable {
+    case int(Int32), float(Float), string(String), blob([UInt8])
+    case int64(Int64), double(Double), bool(Bool), null, impulse
+}
+
+struct OSCMessage: Equatable, Sendable {
+    var address: String
+    var arguments: [OSCArgument]
+
+    func encoded() -> [UInt8] {
+        var out: [UInt8] = []
+        OSC.appendString(address, to: &out)
+        var tags = ","
+        var data: [UInt8] = []
+        for arg in arguments {
+            switch arg {
+            case .int(let v):    tags += "i"; OSC.append32(UInt32(bitPattern: v), to: &data)
+            case .float(let v):  tags += "f"; OSC.append32(v.bitPattern, to: &data)
+            case .string(let s): tags += "s"; OSC.appendString(s, to: &data)
+            case .blob(let b):   tags += "b"; OSC.append32(UInt32(b.count), to: &data); data += b; OSC.pad(&data)
+            case .int64(let v):  tags += "h"; OSC.append64(UInt64(bitPattern: v), to: &data)
+            case .double(let v): tags += "d"; OSC.append64(v.bitPattern, to: &data)
+            case .bool(let v):   tags += v ? "T" : "F"
+            case .null:          tags += "N"
+            case .impulse:       tags += "I"
+            }
+        }
+        OSC.appendString(tags, to: &out)
+        return out + data
+    }
+}
+
+indirect enum OSCPacket: Equatable, Sendable {
+    case message(OSCMessage)
+    case bundle(timeTag: UInt64, elements: [OSCPacket])        // timeTag 1 = immediately
+
+    func encoded() -> [UInt8] {
+        switch self {
+        case .message(let m):
+            return m.encoded()
+        case let .bundle(timeTag, elements):
+            var out = OSC.bundleTag
+            OSC.append64(timeTag, to: &out)
+            for e in elements {
+                let bytes = e.encoded()
+                OSC.append32(UInt32(bytes.count), to: &out)
+                out += bytes
+            }
+            return out
+        }
+    }
+
+    static func decode(_ bytes: [UInt8]) -> OSCPacket? {
+        var reader = OSCReader(bytes)
+        return reader.packet()
+    }
+}
+
+enum OSC {
+    static let bundleTag: [UInt8] = Array("#bundle".utf8) + [0]
+    static func pad(_ out: inout [UInt8]) { while out.count % 4 != 0 { out.append(0) } }
+    static func appendString(_ s: String, to out: inout [UInt8]) { out += Array(s.utf8); out.append(0); pad(&out) }
+    static func append32(_ v: UInt32, to out: inout [UInt8]) {
+        out += [UInt8(v >> 24), UInt8((v >> 16) & 0xFF), UInt8((v >> 8) & 0xFF), UInt8(v & 0xFF)]
+    }
+    static func append64(_ v: UInt64, to out: inout [UInt8]) {
+        append32(UInt32(v >> 32), to: &out); append32(UInt32(v & 0xFFFF_FFFF), to: &out)
+    }
+}
+
+struct OSCReader {
+    private let b: [UInt8]
+    private var i = 0
+    init(_ bytes: [UInt8]) { b = bytes }
+
+    mutating func packet() -> OSCPacket? {
+        if b.starts(with: OSC.bundleTag) {
+            i = 8
+            guard let timeTag = u64() else { return nil }
+            var elements: [OSCPacket] = []
+            while i < b.count {
+                guard let size = u32().map({ Int($0) }), size % 4 == 0, i + size <= b.count else { return nil }
+                var sub = OSCReader(Array(b[i..<(i + size)]))
+                guard let element = sub.packet() else { return nil }
+                elements.append(element)
+                i += size
+            }
+            return .bundle(timeTag: timeTag, elements: elements)
+        }
+        guard let address = string(), address.hasPrefix("/") else { return nil }
+        if i >= b.count { return .message(OSCMessage(address: address, arguments: [])) }  // no type tags
+        guard let tags = string(), tags.hasPrefix(",") else { return nil }
+        var args: [OSCArgument] = []
+        for tag in tags.dropFirst() {
+            switch tag {
+            case "i": guard let v = u32() else { return nil }; args.append(.int(Int32(bitPattern: v)))
+            case "f": guard let v = u32() else { return nil }; args.append(.float(Float(bitPattern: v)))
+            case "s", "S": guard let s = string() else { return nil }; args.append(.string(s))
+            case "b":
+                guard let n = u32().map({ Int($0) }), i + n <= b.count else { return nil }
+                args.append(.blob(Array(b[i..<(i + n)])))
+                i = min(b.count, i + ((n + 3) & ~3))
+            case "h": guard let v = u64() else { return nil }; args.append(.int64(Int64(bitPattern: v)))
+            case "d": guard let v = u64() else { return nil }; args.append(.double(Double(bitPattern: v)))
+            case "T": args.append(.bool(true))
+            case "F": args.append(.bool(false))
+            case "N": args.append(.null)
+            case "I": args.append(.impulse)
+            default:  return nil            // t, c, r, m, arrays: add if you need them
+            }
+        }
+        return .message(OSCMessage(address: address, arguments: args))
+    }
+
+    private mutating func string() -> String? {
+        guard i < b.count, let end = b[i...].firstIndex(of: 0) else { return nil }
+        let s = String(decoding: b[i..<end], as: UTF8.self)
+        i = min(b.count, (end + 4) & ~3)                       // skip NUL + padding
+        return s
+    }
+
+    private mutating func u32() -> UInt32? {
+        guard i + 4 <= b.count else { return nil }
+        defer { i += 4 }
+        return UInt32(b[i]) << 24 | UInt32(b[i + 1]) << 16 | UInt32(b[i + 2]) << 8 | UInt32(b[i + 3])
+    }
+
+    private mutating func u64() -> UInt64? {
+        guard let hi = u32(), let lo = u32() else { return nil }
+        return UInt64(hi) << 32 | UInt64(lo)
+    }
+}
+```
+
+Receiving OSC (unicast UDP to the Mac is **not** gated by Local Network privacy; *sending* replies to
+a LAN device is):
+
+```swift
+import Foundation
+import Network
+
+final class OSCServer: @unchecked Sendable {
+    var onPacket: (@Sendable (OSCPacket, NWEndpoint) -> Void)?
+    private var listener: NWListener?
+    private let queue = DispatchQueue(label: "Prism.OSC")
+
+    func start(port: UInt16) throws {
+        guard let nwPort = NWEndpoint.Port(rawValue: port) else { throw POSIXError(.EINVAL) }
+        let l = try NWListener(using: .udp, on: nwPort)
+        l.newConnectionHandler = { [weak self] connection in   // one NWConnection per remote sender
+            guard let self else { return }
+            connection.start(queue: self.queue)
+            self.receive(on: connection)
+        }
+        l.start(queue: queue)
+        listener = l
+    }
+
+    func stop() { listener?.cancel(); listener = nil }
+
+    private func receive(on connection: NWConnection) {
+        connection.receiveMessage { [weak self] data, _, _, error in
+            if let data, let packet = OSCPacket.decode([UInt8](data)) {
+                self?.onPacket?(packet, connection.endpoint)
+            }
+            if error == nil { self?.receive(on: connection) } else { connection.cancel() }
+        }
+    }
+}
+```
+
+Send OSC with `UDPSocket.send(OSCPacket.message(…).encoded(), to: host, port: port)` (§3.5). Typical
+ports: TouchOSC 8000/9000, QLab 53000/53001.
+
+---

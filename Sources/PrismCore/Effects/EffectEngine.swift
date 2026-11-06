@@ -47,7 +47,7 @@ public enum EffectLibrary {
                 apply(level: level, color: nil, blend: effect.blend, to: &s)
             case .rainbow, .colorCycle:
                 let hue = wrapDegrees(360 * (t * 0.05 + phase))
-                apply(level: nil, color: .rgb(RGBColor(hue: hue, saturation: 1, value: 1)), blend: effect.blend, to: &s)
+                apply(level: nil, color: .rgb(RGB(hue: hue, saturation: 1, value: 1)), blend: effect.blend, to: &s)
             default:
                 break
             }
@@ -92,7 +92,7 @@ public enum MusicMoodLibrary {
             let hue = wrapDegrees(200 + 80 * sin(context.time * 0.1 + g.x * 3))
             let level = a.isActive ? lerp(0.35, 1, a.level * settings.reactivity + (1 - settings.reactivity) * 0.6) : 0.5
             var s = states[id] ?? FixtureState()
-            s.color = .rgb(RGBColor(hue: hue, saturation: 0.9, value: 1))
+            s.color = .rgb(RGB(hue: hue, saturation: 0.9, value: 1))
             s.cells = nil
             s.intensity = clamp01(level * settings.brightness)
             states[id] = s

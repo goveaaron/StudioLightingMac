@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import PrismCore
 
 /// Maps stage meters ↔ view points (aspect-fit with padding). y grows downward (toward camera).

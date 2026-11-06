@@ -117,12 +117,12 @@ private struct ColorSection: View {
                     Text(first.color.label).font(Theme.Font.caption).foregroundStyle(Theme.textTertiary)
                 }
             }
-            channelSlider("R", value: rgb.r, tint: .red) { v in RGBColor(r: v, g: rgb.g, b: rgb.b) }
-            channelSlider("G", value: rgb.g, tint: .green) { v in RGBColor(r: rgb.r, g: v, b: rgb.b) }
-            channelSlider("B", value: rgb.b, tint: .blue) { v in RGBColor(r: rgb.r, g: rgb.g, b: v) }
+            channelSlider("R", value: rgb.r, tint: .red) { v in RGB(r: v, g: rgb.g, b: rgb.b) }
+            channelSlider("G", value: rgb.g, tint: .green) { v in RGB(r: rgb.r, g: v, b: rgb.b) }
+            channelSlider("B", value: rgb.b, tint: .blue) { v in RGB(r: rgb.r, g: rgb.g, b: v) }
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(24), spacing: 8), count: 6), spacing: 8) {
                 ForEach(Self.swatches, id: \.self) { hex in
-                    let c = RGBColor(hex: hex)!
+                    let c = RGB(hex: hex)!
                     ColorSwatch(color: Color(c), size: 20, isSelected: rgb.hex == c.hex)
                         .onTapGesture {
                             app.show.updateStates(ids, undoName: "Color") { _, s in
@@ -136,7 +136,7 @@ private struct ColorSection: View {
         }
     }
 
-    private func channelSlider(_ name: String, value: Double, tint: Color, make: @escaping (Double) -> RGBColor) -> some View {
+    private func channelSlider(_ name: String, value: Double, tint: Color, make: @escaping (Double) -> RGB) -> some View {
         PrismSlider(
             value: Binding(get: { value }, set: { v in
                 let c = make(v)

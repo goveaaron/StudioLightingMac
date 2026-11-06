@@ -3,12 +3,12 @@ import XCTest
 
 final class ColorTests: XCTestCase {
     func testHexRoundTrip() throws {
-        let c = try XCTUnwrap(RGBColor(hex: "#1FA2FF"))
+        let c = try XCTUnwrap(RGB(hex: "#1FA2FF"))
         XCTAssertEqual(c.hex, "#1FA2FF")
-        XCTAssertEqual(RGBColor(hex: "1fa2ff")?.hex, "#1FA2FF")
-        XCTAssertEqual(RGBColor(hex: "#FFF")?.hex, "#FFFFFF")
-        XCTAssertNil(RGBColor(hex: "#12"))
-        XCTAssertNil(RGBColor(hex: "zzzzzz"))
+        XCTAssertEqual(RGB(hex: "1fa2ff")?.hex, "#1FA2FF")
+        XCTAssertEqual(RGB(hex: "#FFF")?.hex, "#FFFFFF")
+        XCTAssertNil(RGB(hex: "#12"))
+        XCTAssertNil(RGB(hex: "zzzzzz"))
     }
 
     func testKelvinRoundTrip() {
@@ -28,7 +28,7 @@ final class ColorTests: XCTestCase {
 
     func testLightColorJSONRoundTrip() throws {
         let colors: [LightColor] = [
-            .rgb(RGBColor(hex: "#00C2B8")!),
+            .rgb(RGB(hex: "#00C2B8")!),
             .kelvin(5600, tint: 0.1),
         ]
         for color in colors {

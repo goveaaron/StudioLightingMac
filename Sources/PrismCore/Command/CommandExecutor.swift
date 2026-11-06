@@ -18,8 +18,8 @@ public struct CommandExecutor {
     /// Default intensity when turning on a light that was off.
     public static let defaultOnIntensity = 0.8
     /// Amber/blue references for warming/cooling colored lights.
-    static let warmReference = LightColor.rgb(RGBColor(hex: "#FF8A3D")!)
-    static let coolReference = LightColor.rgb(RGBColor(hex: "#8FB8FF")!)
+    static let warmReference = LightColor.rgb(RGB(hex: "#FF8A3D")!)
+    static let coolReference = LightColor.rgb(RGB(hex: "#8FB8FF")!)
 
     /// Applies commands in order.
     /// - Parameters:
@@ -156,7 +156,7 @@ public struct CommandExecutor {
                 switch s.color {
                 case .kelvin(let k, let t): s.color = .kelvin(k, tint: clamp(t + delta, -1, 1))
                 default:
-                    let ref = delta > 0 ? LightColor.rgb(RGBColor(hex: "#FF4FD8")!) : LightColor.rgb(RGBColor(hex: "#5CFF7A")!)
+                    let ref = delta > 0 ? LightColor.rgb(RGB(hex: "#FF4FD8")!) : LightColor.rgb(RGB(hex: "#5CFF7A")!)
                     s.color = LightColor.mix(s.color, ref, min(abs(delta), 1) * 0.3)
                 }
             }
@@ -175,7 +175,7 @@ public struct CommandExecutor {
             let ids = targets(sel)
             modify(ids, in: &doc, fade: fade, currentRendered: currentRendered) { _, s in
                 let hsv = s.color.displayRGB.hsv
-                s.color = .rgb(RGBColor(hue: hsv.h, saturation: clamp01(hsv.s + delta), value: 1))
+                s.color = .rgb(RGB(hue: hsv.h, saturation: clamp01(hsv.s + delta), value: 1))
                 s.cells = nil
             }
             if !ids.isEmpty { result.messages.append("\(delta >= 0 ? "Richer" : "Softer") color on \(describe(ids, doc)).") }

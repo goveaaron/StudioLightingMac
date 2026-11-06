@@ -90,7 +90,7 @@ extension Color {
     }
 
     /// Display color for a Prism color value.
-    init(_ rgb: RGBColor, opacity: Double = 1) {
+    init(_ rgb: RGB, opacity: Double = 1) {
         self.init(.sRGB, red: rgb.r, green: rgb.g, blue: rgb.b, opacity: opacity)
     }
 
@@ -100,14 +100,14 @@ extension Color {
 
     /// Hex parsing for user-entered strings; nil when invalid.
     init?(hexString: String) {
-        guard let rgb = RGBColor(hex: hexString) else { return nil }
+        guard let rgb = RGB(hex: hexString) else { return nil }
         self.init(rgb)
     }
 
     /// sRGB components (for eyedropper / NSColor interop).
-    var rgbColor: RGBColor? {
+    var rgbColor: RGB? {
         guard let ns = NSColor(self).usingColorSpace(.sRGB) else { return nil }
-        return RGBColor(r: Double(ns.redComponent), g: Double(ns.greenComponent), b: Double(ns.blueComponent))
+        return RGB(r: Double(ns.redComponent), g: Double(ns.greenComponent), b: Double(ns.blueComponent))
     }
 }
 

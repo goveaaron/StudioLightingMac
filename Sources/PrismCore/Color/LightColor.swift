@@ -8,7 +8,7 @@ import Foundation
 /// fixtures that can't do that natively.
 public enum LightColor: Hashable, Sendable {
     /// sRGB color, exactly as typed in a hex code.
-    case rgb(RGBColor)
+    case rgb(RGB)
     /// Correlated color temperature in Kelvin, plus tint: -1 = full green … 0 = neutral … +1 = full magenta.
     case kelvin(Double, tint: Double)
     /// Hue in degrees (0..<360) and saturation (0 = white at 5600K … 1 = fully saturated).
@@ -21,7 +21,7 @@ public enum LightColor: Hashable, Sendable {
     public static let tungsten: LightColor = .kelvin(3200, tint: 0)
 
     public static func hex(_ string: String) -> LightColor? {
-        RGBColor(hex: string).map { LightColor.rgb($0) }
+        RGB(hex: string).map { LightColor.rgb($0) }
     }
 
     /// Normalized linear-light RGB at full brightness (max component = 1), sRGB primaries.
@@ -36,7 +36,7 @@ public enum LightColor: Hashable, Sendable {
             return ColorMath.xyToLinearSRGB(x: x, y: y).normalized
         case .hsi(let hue, let sat):
             // Saturation blends from 5600K white to the fully saturated hue (in linear light).
-            let pure = RGBColor(hue: hue, saturation: 1, value: 1).linear
+            let pure = RGB(hue: hue, saturation: 1, value: 1).linear
             let white = LightColor.kelvin(5600, tint: 0).linearRGB
             let s = clamp01(sat)
             return LinearRGB(
@@ -50,15 +50,15 @@ public enum LightColor: Hashable, Sendable {
     }
 
     /// A display color for UI swatches and the stage visualizer (full brightness).
-    public var displayRGB: RGBColor {
+    public var displayRGB: RGB {
         switch self {
         case .rgb(let c):
             // Show the hue at full value so dim colors still read correctly on screen.
             let m = max(c.r, c.g, c.b)
             guard m > 1e-6 else { return .black }
-            return RGBColor(r: c.r / m, g: c.g / m, b: c.b / m)
+            return RGB(r: c.r / m, g: c.g / m, b: c.b / m)
         default:
-            return RGBColor(linear: linearRGB)
+            return RGB(linear: linearRGB)
         }
     }
 
@@ -112,7 +112,7 @@ public enum LightColor: Hashable, Sendable {
     /// Returns a copy with all numeric fields sanitized (finite, in valid ranges).
     public var sanitized: LightColor {
         switch self {
-        case .rgb(let c): return .rgb(RGBColor(r: c.r.finiteOr(1), g: c.g.finiteOr(1), b: c.b.finiteOr(1)))
+        case .rgb(let c): return .rgb(RGB(r: c.r.finiteOr(1), g: c.g.finiteOr(1), b: c.b.finiteOr(1)))
         case .kelvin(let k, let t): return .kelvin(clamp(k.finiteOr(5600), 1000, 20000), tint: clamp(t.finiteOr(0), -1, 1))
         case .hsi(let h, let s): return .hsi(hue: wrapDegrees(h.finiteOr(0)), saturation: clamp01(s.finiteOr(1)))
         case .xy(let x, let y): return .xy(x: clamp(x.finiteOr(0.3127), 0.0, 0.8), y: clamp(y.finiteOr(0.329), 0.01, 0.9))
@@ -132,7 +132,7 @@ public enum LightColor: Hashable, Sendable {
         let la = ColorMath.linearToOKLab(a.linearRGB)
         let lb = ColorMath.linearToOKLab(b.linearRGB)
         let mixed = ColorMath.okLabToLinear(L: lerp(la.L, lb.L, t), a: lerp(la.a, lb.a, t), b: lerp(la.b, lb.b, t))
-        return .rgb(RGBColor(linear: mixed.clamped.normalized))
+        return .rgb(RGB(linear: mixed.clamped.normalized))
     }
 }
 
@@ -159,7 +159,7 @@ extension LightColor: Codable {
             self = LightColor.xy(x: x, y: y).sanitized
         default:
             let hex = try c.decodeIfPresent(String.self, forKey: .hex) ?? "#FFFFFF"
-            self = .rgb(RGBColor(hex: hex) ?? .white)
+            self = .rgb(RGB(hex: hex) ?? .white)
         }
     }
 

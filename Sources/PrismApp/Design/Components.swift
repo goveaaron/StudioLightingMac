@@ -350,7 +350,7 @@ struct NumericField: View {
 /// Hex color entry (#RRGGBB or RRGGBB or #RGB). Invalid input reverts with a beep.
 struct HexField: View {
     let hex: String
-    var onCommit: (RGBColor) -> Void
+    var onCommit: (RGB) -> Void
 
     @State private var text = ""
     @FocusState private var focused: Bool
@@ -378,7 +378,7 @@ struct HexField: View {
     private func stripped(_ h: String) -> String { h.replacingOccurrences(of: "#", with: "").uppercased() }
 
     private func commit() {
-        if let rgb = RGBColor(hex: text) {
+        if let rgb = RGB(hex: text) {
             onCommit(rgb)
             text = stripped(rgb.hex)
         } else if stripped(hex) != stripped(text) {

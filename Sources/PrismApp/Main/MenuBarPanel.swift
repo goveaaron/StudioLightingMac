@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import PrismCore
 
 /// Menu bar control: looks, master, blackout, music — usable with the main window closed.

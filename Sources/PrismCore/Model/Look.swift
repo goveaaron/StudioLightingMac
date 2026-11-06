@@ -52,9 +52,9 @@ public struct Look: Codable, Hashable, Sendable, Identifiable {
     }
 
     /// Up to `max` representative display colors (for list thumbnails / dots).
-    public func swatchColors(max count: Int = 4) -> [RGBColor] {
+    public func swatchColors(max count: Int = 4) -> [RGB] {
         var seen: [String] = []
-        var out: [RGBColor] = []
+        var out: [RGB] = []
         for (_, state) in states.storage.sorted(by: { $0.key.uuidString < $1.key.uuidString }) where state.intensity > 0.01 {
             let rgb = state.color.displayRGB
             if !seen.contains(rgb.hex) {

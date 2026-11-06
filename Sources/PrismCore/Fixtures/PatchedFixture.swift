@@ -189,7 +189,7 @@ public struct FixtureGroup: Codable, Hashable, Sendable, Identifiable {
 }
 
 /// A fixture definition + mode resolved for a patched fixture (computed, not stored).
-public struct ResolvedFixture: Sendable {
+public struct ResolvedFixture: Sendable, Identifiable {
     public var fixture: PatchedFixture
     public var definition: FixtureDefinition
     public var mode: FixtureMode

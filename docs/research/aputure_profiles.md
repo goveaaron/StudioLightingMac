@@ -631,3 +631,485 @@ CCT 2000–10000 K. Same Gen-1 encodings as §1.1.
 - "8 Bit – Source" appears twice, and the second copy sits where 16-bit Source should be.
 
 ---
+
+## 8. Aputure LS (Light Storm) COB family
+
+### 8.1 LS 600c Pro and LS 600c Pro II (RGBWW COB)
+
+**Sources:**
+- LS600c Pro & LS600c Pro II DMX Profile Specification V1.6 [V] https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%20600c%20Pro%20II/Documents/LS600c%20Pro%20%26%20LS600c%20Pro%20II%20DMX%20Profile%20Specification%20V1.6.pdf
+- Settings help [V] https://help.aputure.com/en/ls600c-pro/lighting-configuration-settings · https://help.aputure.com/en/ls-600c-pro-ii/lighting-configuration-settings
+
+CCT 2300–10000 K. Gen-1 encodings (§1.1).
+
+**How to set** [V]:
+1. Press **MENU**, rotate the Select wheel to **DMX Mode**.
+2. **DMX Address**: hold MENU 2 s to lock; hold SELECT 2 s to unlock.
+3. **DMX Loss Behavior**: choose what happens when signal drops.
+4. **DMX Profile**: pick a profile from the 8-bit or 16-bit list.
+
+The Pro II also has:
+- **DMX Smoothing**: Off / Feather / Smooth / Super Smooth
+- CRMX, Art-Net and sACN
+
+**8-bit modes:**
+
+| # | Name | Ch | Channels |
+|---|---|---|---|
+| 1 | CCT & RGB 8-bit | 8 | Int, CCT, G/M, CCT↔RGB, R, G, B, Strobe |
+| 2 | CCT 8-bit | 4 | Int, CCT, G/M, Strobe |
+| 3 | CCT & HSI 8-bit | 8 | Int, CCT, G/M, CCT↔HSI, Hue, Sat, HSI Base CCT (0–10 = 6500 K), Strobe |
+| 4 | RGB 8-bit | 5 | Int, R, G, B, Strobe |
+| 5 | HSI 8-bit | 5 | Int, Hue, Sat, HSI Base CCT, Strobe |
+| 6 | GEL 8-bit | 6 | Int, CCT, Rosco/Lee, Series, Category, Strobe |
+| 7 | xy 8-bit | 4 | Int, x, y, Strobe |
+| 8 | Source 8-bit | 5 | INT, Source (3-value steps … 102–104 Blow Torch, 105–107 Road Flare … 136–138 Violet Glow Stick), x, y, Strobe |
+| 9 | FX 8-bit | 10 | see below |
+| 10 | WW & RGB 8-bit | 5 | Warm White, Cool White, R, G, B |
+| 11 | Ultimate Mode 8-bit | 11 | Int; ch 2 Lighting Mode Selection (0–9 CCT & RGB … 80–89 FX, misprinted "80–79"); ch 3–11 parameters |
+
+**Mode 9, FX 8-bit (10 ch):**
+- **Ch 1:** Int.
+- **Ch 2:** Effect Trigger — 0–10 Loop · 11–60 Trigger · 61–255 Stop.
+- **Ch 3:** FX Selection — 0–9 Club Lights … 140–149 Fireworks.
+- **Ch 4–10:** parameters.
+
+**16-bit modes:**
+
+| # | Name | Ch |
+|---|---|---|
+| 12 | CCT & RGB 16-bit | 15 |
+| 13 | CCT 16-bit | 7 |
+| 14 | CCT & HSI 16-bit | 15 |
+| 15 | RGB 16-bit | 9 |
+| 16 | HSI 16-bit | 9 |
+| 17 | GEL 16-bit | 7 |
+| 18 | xy 16-bit | 7 |
+| 19 | Source 16-bit | 6 |
+| 20 | **"FX CCT 16-bit"** | 12 (1/2 Int, 3 FX select, 4–12) |
+| 21 | WWRGB 16-bit | 10 |
+| 22 | Ultimate Mode 16-bit | 16 |
+
+### 8.2 LS 600x Pro (bi-colour)
+
+**Sources:**
+- LS600X Pro DMX Profile Specification V1.0.1 (Feb 2022, firmware v1.2) [V] https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%20600x%20Pro/All%20Files/LS600X-Pro-DMX-Profile-Specification-V1.0-.pdf
+- Manual [V] https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%20600x%20Pro/All%20Files/LS-600x-Pro-Product-Manual.pdf
+
+CCT 2700–6500 K. **Menu:** DMX Mode → DMX Address / DMX Loss Behavior / DMX Profile. [V]
+
+| # | Name | Ch | Channels |
+|---|---|---|---|
+| 1 | Lighting | 2 | Int, CCT |
+| 2 | Effects | 5 | Int, CCT, Effects, Frequency, Trigger |
+| 3 | Lighting & Effects | 6 | Int, CCT, Mode (0–127 Lighting / 128–255 Effects), Effects, Frequency, Trigger |
+
+Value ranges:
+- **Effects:** 0–19 Paparazzi · 20–39 Fireworks · 40–59 Faulty bulb · 60–79 Lightning · 80–99 TV · 100–119 Pulsing · 120–139 Strobe · 140–159 Explosion · 160–179 Fire · 180–255 reserved.
+- **Frequency:** 1–10 in 20-value steps; 200–219 Random; 220–255 reserved.
+- **Trigger:**
+  - Lightning: 0–10 Stop, 11–127 Trigger, 128–255 Loop
+  - Explosion: 0–10 Stop, 11–127 Trigger, 128–255 reserved
+
+OFL splits the trigger across two channels (6 / 7-channel modes). The official doc does not, so this is an OFL error. [OFL vs V]
+
+### 8.3 LS 300x (bi-colour; the official manual contains the DMX chart)
+
+**Source:** LS 300x Product Manual [V] https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%20300x/All%20files/LS_300x-Product_Manual_EN.pdf
+
+**One mode, 6 channels:**
+
+| Ch | Function | Values |
+|---|---|---|
+| 1 | Dimmer | 0–255 |
+| 2 | CCT | **stepped**: 0–5 = 2700 K, 6–10 = 2800 K … 191–195 = 6500 K (100 K per 5 values); 196–255 undefined |
+| 3 | FX Frequency | 0–19 = 1 … 180–199 = 10; 200–219 = Random; 220–255 undefined |
+| 4 | Mode | 0–127 Manual / 128–255 FX |
+| 5 | FX | 0–19 Paparazzi · 20–39 Fireworks · 40–59 Faulty Bulb · 60–79 Lightning · 80–99 TV · 100–119 Pulsing · 120–139 Strobe · 140–159 Explosion · 160–178 Fire · 180–255 undefined |
+| 6 | Trigger | **Lightning:** 0 start, 1–127 single trigger, 128–255 cycle<br>**Explosion:** 0 start, 1–127 single trigger, 128–255 undefined |
+
+**How to set** [V]:
+1. Press **MENU** and rotate the dimming wheel to **"DMX mode"**, then press MENU.
+2. Rotate the brightness wheel to set the channel.
+3. Press MENU to go back.
+
+When chaining several lights, space their addresses 6 apart.
+
+### 8.4 LS 600d Pro and LS 300d II (daylight)
+
+**Sources** [V]:
+- https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%20600d%20Pro/All%20Files/LS-600d-Pro-DMX-Profile-Specification-V1.0-.pdf
+- Common doc: https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%20300d%20II/All%20files/LS-600d-Pro-LS-300d-II-common-DMX-Profile-Specification-V1.0.pdf
+
+**One mode, "Lighting & Effect 8-bit", 5 ch:**
+- Int
+- Mode: 0–127 Lighting / 128–255 Effects
+- Effects: same list as §8.5 with no Fire; 160–255 reserved
+- Frequency
+- Trigger
+
+OFL lists 6 ch. Follow the official doc.
+
+### 8.5 LS 600d (V1.0.1 Apr 2022) and LS 1200d Pro
+
+**Sources** [V]:
+- https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%20600d/All%20files/LS-600d-DMX-Profile-Specification-V1.0-.pdf
+- https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/LS%201200d%20Pro/All%20Files/LS1200D-Pro-DMX-Profile-Specification-V1.0-.pdf
+
+| # | Name | Ch | Channels |
+|---|---|---|---|
+| 1 | Lighting 8-bit | **1** | Intensity |
+| 2 | Effect 8-bit | 4 | Intensity, Effects, Frequency, Trigger |
+| 3 | Lighting & Effect 8-bit | 5 | Intensity, Mode (0–127 Lighting / 128–255 Effects), Effects, Frequency, Trigger |
+| 4 | Lighting 16-bit (1200d Pro only) | 2 | Intensity coarse/fine |
+| 5 | Effect 16-bit (1200d Pro only) | 5 | Intensity 16-bit, Effects, Frequency, Trigger |
+| 6 | Lighting & Effect 16-bit (1200d Pro only) | 6 | Intensity 16-bit, Mode, Effects, Frequency, Trigger |
+
+Value ranges:
+- **Effects:** 0–19 Paparazzi · 20–39 Fireworks · 40–59 Faulty bulb · 60–79 Lightning · 80–99 TV · 100–119 Pulsing · 120–139 Strobe · 140–159 Explosion · 160–255 Reserved.
+- **Frequency:** 1–10 in 20-value steps; 200–219 Random; 220–255 reserved.
+- **Trigger:**
+  - Lightning: 0–10 Stop, 11–127 Trigger, 128–255 Loop
+  - Explosion: 0–10 Stop, 11–127 Trigger, 128–255 reserved
+
+**A daylight LS in "Lighting 8-bit" is a real 1-channel "Dimmer only" Aputure fixture.** See §13.
+
+### 8.6 LS C300d II
+
+Source: OFL `aputure/ls-c300d-ii`, which cites the manual. The manual itself is image-only. [OFL]
+
+**5 ch:**
+- Dimmer
+- Mode: 0–127 Manual / 128–255 FX
+- FX Control: same list as LS 300x minus Fire; 160–255 none
+- FX Frequency: 1–10 in 20-value steps; 200–219 Random
+- FX Options (trigger)
+
+---
+
+## 9. Aputure STORM (OS II protocol)
+
+### 9.1 STORM 1000c / STORM 80c
+
+**Source:** STORM 1000c & 80c DMX Profile Specification V1.3 (May 2026, controller firmware V1.0) [V] https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/STORM%2080c/manuals/STORM%201000c%20%26%2080c%20DMX%20Profile%20Specification%20V1.3.pdf
+
+**Encodings:**
+- CCT 1800–20000 K (3200 K = 20; 16-bit 5041).
+- ±Green default 137 (the overview text says 133); 16-bit default 35390.
+- Odd-numbered profiles are 8-bit and even-numbered are 16-bit.
+
+**Basic profiles:**
+
+| # (8 / 16-bit) | Name | Ch (8 / 16) | 8-bit channel order |
+|---|---|---|---|
+| 1 / 2 | CCT & RGB | 7 / 14 | Int, CCT, ±Green, Crossfade (White Light → RGB), R, G, B |
+| 3 / 4 | CCT & RGB & FX | 17 / 26 | P1 + 8 Crossfade 2 (static → FX), 9 Trigger, 10 Effect select (15 effects, Club Lights … Fireworks), 11–17 Effect parameters |
+| 5 / 6 | CCT & RGB & xy | 10 / 20 | P1 + 8 Crossfade 2 (→ xy), 9 x, 10 y (defaults = 3200 K: x 0.4234 → 136, y 0.3989 → 125) |
+| 7 / 8 | CCT & RGB & xy & FX | 20 / 32 | |
+| 9 / 10 | HSI | 3 / 6 | Int, Hue 0–359.9°, Sat |
+| 11 / 12 | HSIC+ | 5 / 10 | Int, CCT, ±Green, Hue, Sat |
+| 13 / 14 | HSIC+ & FX | 15 / 22 | |
+| 15 / 16 | HSIC+ & xy | 8 / 16 | |
+| 17 / 18 | HSIC+ & xy & FX | 18 / 28 | |
+| 19 / 20 | xy | 3 / 6 | |
+| 21 / 22 | RGB | 3 / 6 | R, G, B (no intensity channel) |
+| 23 / 24 | iRGB | 4 / 8 | Int, R, G, B |
+| 25 / 26 | RGBACL | 6 / 12 | R, G, B, Amber, Cyan, Lime |
+| 27 / 28 | CCT+ | 3 / 6 | Int, CCT, ±Green |
+| 29 / 30 | Source Mode | 4 / 7 | Int, Source, x, y |
+| 31 / 32 | Legacy Gel | 5 / 6 | |
+
+**Control profiles 41–72:** each is the matching basic profile plus **Strobe, Control and Fan**. Example: P41 "CCT & RGB & Control 8-bit" = P1 + 8 Strobe, 9 Control, 10 Fan Mode = 10 ch.
+
+**Colour-space profiles 81–90, all "& Control":**
+
+| Profile | Ch (8-bit / 16-bit) |
+|---|---|
+| VRGB | P81 9 / P82 14 |
+| VRGB-I | P83 10 / P84 16 |
+| VRGB-CS | P85 7 / P86 10 |
+| VRGB-709 | P87 6 / P88 9 |
+| VRGB-sRGB | P89 6 / P90 9 |
+
+P81 layout: R, G, B, CCT, ±Green, Color (colour-space chart), Strobe, Control, Fan.
+
+**Strobe:** 0–13 Off · 14–128 Random 0.4–25 Hz · 129–255 Constant 0.4–25 Hz.
+
+**Fan:** 0–38 Smart · 39–77 High (39–50 Max, 80c only) · 78–115 Medium · 116–153 Low · 154–191 Delayed · 192–255 Silent. The fan channel only works when the light's System Fan setting is "DMX Controlled".
+
+**Control channel:** hold the value for 2.5 s, then return to 0. The light confirms with a red flash at 20 %.
+
+| Values | Action |
+|---|---|
+| 0–10 | none |
+| 11–13 / 14–16 | flash on / off |
+| 17–19 / 20–22 / 23–25 | Sidus Bluetooth on / off / reset |
+| 26–28 / 29–31 / 32–34 / 35–37 | smoothing Off / Smooth / Super Smooth / Feather |
+| 38–40 / 41–43 / 44–46 / 47–49 / 50–52 / 53–55 | CRMX on / off / unlink / link / RX / TX |
+| 56–58 / 59–61 | RDM off / on |
+| 62–64 / 65–67 | High Speed on / off |
+| 68–70 / 71–73 | Constant Output / Max Output |
+| 74–76 / 77–79 | Studio Mode on / off |
+| 80–82 / 83–85 | fan DMX control on / off |
+| 98–100 / 101–103 / 104–106 / 107–109 | dimming curve Linear / Exp / Log / S-curve |
+| 250–252 / 253–255 | control channel on / off |
+
+The doc's prose examples cite channels 7/8/9; the tables (8/9/10) are authoritative.
+
+### 9.2 STORM 1200x (bi-colour)
+
+**Source:** STORM 1200x DMX Profile Specification V1.5 (July 2025) [V] https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/STORM%201200x/documents/STORM%201200x%20DMX%20Profile%20Specification%20V1.5.pdf
+
+**Encodings:**
+- CCT 2500–10000 K: 3200 = 24 (16-bit 6117), 5600 = 106, 6500 = 136, 10000 = 255.
+- ±Green default 133.
+- Odd profiles are 8-bit, even are 16-bit.
+
+| # | Name | Ch (8 / 16) | 8-bit order |
+|---|---|---|---|
+| 1 / 2 | CCT+ | 3 / 6 | Int, CCT, ±Green |
+| 3 / 4 | CCT+ Control | 6 / 9 | + Strobe, Control, Fan (0–38 Auto/Smart, 39–77 Max, 78–115 Med, 116–153 Low, 154–191 Delayed, 192–255 Silent) |
+| 5 / 6 | CCT+ Control & FX | 10 / 13 | Int, CCT, ±Green, Crossfade (CCT → FX), Trigger, Effect, Frequency, Strobe, Control, Fan |
+| 7 / 8 | xy | 3 / 6 | |
+| 9 / 10 | xy & Control | 6 / 9 | |
+| 11 / 12 | xy & Control & FX | 10 / 13 | |
+| 13 / 14 | CCT & xy | 6 / 12 | |
+| 15 / 16 | CCT & xy & Control | 9 / 15 | the doc misnumbers ch 11–13 |
+| 17 / 18 | Limited CCT & RGB | 7 / 14 | Int, CCT, ±Green, Crossfade (CCT → RGB), R, G, B |
+| 19 / 20 | Limited CCT & RGB & Control | 10 / 17 | |
+| 21 / 22 | Limited HSIC+ | 5 / 10 | |
+| 23 / 24 | Limited HSIC+ Control | 8 / 13 | |
+| 25 / 26 | RGB | 3 / 6 | |
+| 27 / 28 | RGB & Control | 6 / 9 | |
+| 29 / 30 | RGBA | 4 / 8 | |
+| 31 / 32 | RGBA & Control | 7 / 11 | |
+
+---
+
+## 10. Aputure Electro Storm XT26 and CS15 (variable footprint)
+
+**Sources** [V]:
+- https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/Electro%20Storm%20XT26/Electro%20Storm%20XT26%20DMX%20Profile%20Specification%20V1.1.pdf (the header reads V1.2, May 2024, firmware V1.2)
+- https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/Electro%20Storm%20CS15/Electro%20Storm%20CS15%20DMX%20Profile%20Specification%20V1.1.pdf (V1.1, Jan 2024, firmware V1.2)
+- XT26 manual: https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/Electro%20Storm%20XT26/ElectroStorm%20XT26%20Manual%20V1.0%20EN.pdf
+
+**The footprint changes with two settings** in the light's **"DMX Profile Extension"** menu. Changing either one means the fixture must be re-patched.
+- **"Motorized Accessories"** (default ON) adds **+3 ch**:
+  - Zoom 18–50°
+  - Pan 0–360°
+  - Tilt ±135°
+  - Each has 0–19 = no effect.
+- **"Function Configuration"** (default ON) adds **+2 ch**:
+  - Fan: Smart / High / Medium / Silent, in quarters of the range
+  - Dimming curve: Linear / S-curve / Exp / Log
+
+**XT26** (2700–6500 K; G/M is half range):
+
+| # | Name | Ch | Notes |
+|---|---|---|---|
+| 1 | CCT 8-bit | 4–9 | 1 Int, 2 CCT, 3 G/M, 4 Strobe; + 5 Zoom, 6 Pan, 7 Tilt; + 8 Fan, 9 Dimming curve |
+| 2 | FX 8-bit | 4–9 | |
+| 3 | CCT & FX 8-bit | 7–12 | |
+| 4 | CCT 16-bit | 7–15 | |
+| 5 | FX 16-bit | 5–13 | the table of contents says 4–12 |
+| 6 | CCT & FX 16-bit | 10–18 | |
+
+**CS15** (2000–10000 K), 22 modes:
+
+| # | Name | Ch | Notes |
+|---|---|---|---|
+| 1 | CCT & RGB 8-bit | 8–13 | Int, CCT, G/M, CCT↔RGB, R, G, B, Strobe, + options |
+| 2 | CCT 8-bit | 4–9 | |
+| 3 | CCT & HSI 8-bit | 8–13 | |
+| 4 | RGB 8-bit | 5–10 | |
+| 5 | Adv.HSI 8-bit | 5–10 | |
+| 6 | Gel 8-bit | 6–11 | |
+| 7 | x y 8-bit | 4–9 | |
+| 8 | Source 8-bit | 5–10 | |
+| 9 | FX 8-bit | 10–15 | |
+| 10 | WWRGB 8-bit | 6–11 | |
+| 11 | Ultimate 8-bit | — | the doc leaves the count blank |
+| 12–22 | 16-bit versions | — | 12 CCT & RGB 15–23 · 13 CCT 7–15 · 14 CCT & HSI 15–23 · 15 RGB 9–17 · 16 Adv.HSI 9–17 · 17 Gel 7–15 · 18 x y 7–15 · 19 Source 6–14 · 20 FX 13–21 · 21 WWRGB 11–19 · 22 Ultimate 8–24 |
+
+---
+
+## 11. amaran Ray 360c / 660c and amaran Halo 60x / 100x / 200x / 300x / 600x (2025–26 COBs)
+
+**Sources:**
+- amaran DMX Profile Specification **V1.2 EN (June 2026)** [V]. It is image-only; I read it page by page. https://cdn.shopify.com/s/files/1/0862/5432/1947/files/amaran_DMX_V1.2_EN.pdf?v=1793844618
+- CN V1.1 (Mar 2026, text) https://cdn.shopify.com/s/files/1/0862/5432/1947/files/amaranHalo_DMXProfile_CN_V1.1_260303.pdf?v=1772650840
+- Ray CN V1.0 https://cdn.shopify.com/s/files/1/0862/5432/1947/files/amaranRay360c660c_DMXProfile_CN_V1.0.pdf?v=1764889016
+- Halo help [V] https://help.amarancreators.com/en/amaran-halo-60x-100x/operation-and-controls
+
+These lights use the **new locking "amaran USB-C to 5-Pin DMX In & Out Adapter"**. [V] Halo is bi-colour, 2700–6500 K.
+
+| # | Name | Ch | Channels |
+|---|---|---|---|
+| 1 | CCT Universal | 3 | Int, CCT 2700–6500 K (3200 = 34, 5600 = 195), Strobe (0–13 Off, 14–128 Random 1–25 Hz, 129–255 Constant) |
+| 2 | CCT | 5 | Int, CCT, ±Green (default 133), Strobe, CCT Extension (0–127 off / 128–255 on) |
+| 3 | RGB | 5 | Int, R, G, B, Strobe (CCT locked at 6500 K) |
+| 4 | CCT & RGB | 9 | Int, CCT, ±Green, Crossfade, R, G, B, Strobe, CCT Extension |
+| 5 | HSI | 4 | Int, Hue, Sat, Strobe |
+| 6 | HSIC+ | 7 | Int, CCT, ±Green, Hue, Sat, Strobe, CCT Extension |
+| 7–12 | profiles 1–6 + Control + Fan | 5 / 7 / 7 / 11 / 6 / 9 | e.g. P7 = Int, CCT, Strobe, Control, Fan |
+
+Notes:
+- **P1 limits CCT and drops ±Green** so that mixed amaran series behave alike.
+- **P2 CCT range** depends on CCT Extension:
+  - Off: 2300–10000 K (3200 = 30)
+  - On: 1800–20000 K. The doc says 3200 = 17, but a linear scale would give 20. Flag this.
+- **Fan (P7–12):** 0–63 Auto/Smart · 64–127 High · 128–191 Delayed · 192–255 Silent.
+- **Control chart:** 11–16 flash, 26–37 smoothing; all other values N/A.
+- **Compatibility:** Ray 360c/660c support every profile. **Halo models support only P1 (and its Control version, P7).**
+
+**How to set on a Halo** [V]:
+1. Main menu (rotate and press the CCT knob) → **DMX**.
+2. The menu shows **DMX Status Display**, **DMX Address** (1–512), **DMX Signal Loss Behavior** and **DMX Profile**.
+3. Signal-loss choices: Hold Last State / Instant Off / Fade Out / Hold 2 min then Fade Out.
+
+**Ray:** the path is presumably the same. [INF]
+
+---
+
+## 12. Fixtures in the brief with no wired DMX [V]
+
+These are controlled only by on-board controls and the Sidus Link / amaran app over Bluetooth mesh. Each spec page lists "Control Methods: Manual, Sidus Link App" with no DMX:
+- amaran **100d S / 200d S / 100x S / 200x S**
+- **150c / 300c**
+- **COB 60d S / 60x S**
+- **P60c / P60x**
+- **Ace 25c / 25x** (Manual, amaran App)
+- **Aputure Accent B7c** (on-board, Sidus Link, Bluetooth mesh; 2000–10000 K; E26/E27)
+- **amaran Verge** (on-board / app)
+
+Sources:
+- https://help.aputure.com/en/amaran-150c-300c/photometrics-technical-specifications
+- https://help.aputure.com/en/amaran-p60c-p60x/photometrics-and-technical-specifications
+- https://help.aputure.com/en/b7c-bulb/photometrics-technical-specifications
+- https://help.aputure.com/en/amaran-100xs-200xs/technical-specifications-photometrics
+- https://help.aputure.com/en/amaran-60ds/photometrics-technical-specifications
+- The amaran wired-DMX compatibility list is limited to F21c/F22c/F21x/F22x, PT1c/PT2c/PT4c, T2c/T4c, Ray 360c/660c and Halo 60x–600x: https://help.aputure.com/en/which-amaran-lights-can-i-control-with-dmx-which-adapters-are-needed-for-each-fixture
+
+Prism cannot drive any of these over the Enttec. Sidus Link Pro (iPad) can control them over Bluetooth, but that is outside DMX.
+
+---
+
+## 13. The user's other two fixtures: hypotheses [INF]
+
+**Round fixture shown as "Dimmer" only.** Three explanations fit:
+- A **daylight Aputure LS** (LS 600d or LS 1200d Pro) in **"Lighting 8-bit"**, a true 1-channel mode (§8.5).
+- A **COB patched in Lightkey as a generic 1-channel dimmer.** If this is an amaran Halo in P1 "CCT Universal":
+  - The light's ch 2 (CCT) and ch 3 (strobe) would sit at 0, giving 2700 K with strobe off.
+  - Prism would then need a "CCT stays at 0" warning, or should simply patch the real 3-ch profile.
+- A practical lamp on a DMX dimmer pack.
+
+The Halo's own P1 would show Dimmer + Color + Strobe, not Dimmer alone.
+
+**Square panel:**
+- Most likely an **amaran F22c** (2 × 2 ft, on the same amaran USB-C adapter family as the PT tubes) or an **F22x**.
+- Alternatively an Aputure **Nova P300c**, which Lightkey draws as a 6 × 6 grid.
+- Ask the user for the model name, or for the Lightkey patch line showing manufacturer, fixture, mode and footprint.
+
+---
+
+## 14. Implementation notes for Prism's fixture library [INF, derived from the above]
+
+- **Model a mode as:**
+  - an ordered list of channel roles: intensity, cct, gm, xfade, red/green/blue, hue, sat, hsiBaseCct, x, y, strobe, reserved, enum (FX select), and so on
+  - plus, for pixel modes, a repeat block: `pixelCount × [roles]`
+  - plus an optional header, which none of the PT / INFINIBAR / MT Pro / Nova pixel modes have
+- **Key modes by (manufacturer, model, mode name, footprint).** Mode numbers differ between docs, Lightkey and the grandMA pack (T2c/T4c, INFINIBAR).
+- **Value encoders needed:**
+  - Gen-1 G/M piecewise table
+  - linear CCT with per-family limits, plus the stepped LS 300x table
+  - hue 1–360°
+  - xy 0–0.8
+  - OS-II 16-bit ±Green table
+  - enum FX tables
+- **Pixel UI:** draw the selected mode's real pixel count (2/4/8/16), not a fixed 16. Offer "reverse pixel order" and "mirror with another fixture" (same address).
+- **Colour control:**
+  - For CCT & RGB blocks, output white as crossfade 0 + CCT + G/M, and colour as crossfade 255 + RGB.
+  - Intermediate crossfade values blend the two; this gives smooth white↔colour fades.
+- **Patch validation:**
+  - Reject footprints over 512 or overlapping addresses unless the user chooses mirroring.
+  - Warn that a PT2c can't do 16 px, nor a PT1c 8/16 px.
+  - Warn that an INFINIBAR PB3 has no 16 px mode.
+- **Electro Storm:** footprint depends on the two "DMX Profile Extension" toggles, so Prism must ask about them.
+
+---
+
+## 15. Gaps and open questions
+
+1. **Which PT LE mode the user actually runs.** Confirm in Lightkey (mode name / footprint) or on the tube.
+2. **PT physical pixel order** (which end is LE 1) is undocumented. Test with LE 1 = red.
+3. **PT on-screen labels for profiles 7–14** are unknown; choose by number. The white point of PT HSI modes at saturation 0 is undocumented.
+4. **Profile selection on the light itself** is undocumented for T2c/T4c and F21/F22. Only the address step appears in the help and manuals.
+5. **Nova P300c exact DMX button path** is undocumented; the help only says "Rotate the wheel to select the DMX Profile".
+6. **Lightkey's library has errors:**
+   - INFINIBAR "18 Pixels" really means 16.
+   - MT Pro has an unofficial 2-px mode.
+   - Nova P600c has a duplicated Source mode and is missing LE HSI.
+   - Lightkey's PT profile ignores tube length.
+7. **Conflicting mode numbering** for T2c/T4c (PDF vs grandMA vs Lightkey) and per-bar INFINIBAR numbering.
+8. **Not captured: QLC+ has no Aputure fixtures.** GDTF Share files were not downloaded (the account wall). Sidus Link Bridge / Sidus One are not DMX targets for Prism.
+9. **Image-only PDFs I did not transcribe:** amaran 150c, 200x S, 200d S, 60d S, F22x manuals; Verge; LS C300d II manual. None of these documents carry DMX tables for the lights in this report, because those lights have no DMX (except the F22x, whose spec PDF is covered in §6, and the LS C300d II, covered from OFL in §8.6).
+10. **Doc typos to code around:**
+    - INFINIBAR LE RGB 16 px is printed as 72 (correct: 64).
+    - "80–79" in the Ultimate modes means 80–89.
+    - STORM 1000c prose cites wrong channels.
+    - LS 300x CCT chart overlaps.
+    - XT26 FX 16-bit count differs between the table of contents and the body.
+
+---
+
+## 16. Source index
+
+**Official Aputure DMX specs:**
+- Base: https://docs.aputure.com/hubfs/Knowledge%20Base/Aputure/
+- Paths under it:
+  - `Infinibar/All%20Files/INFINIBAR%20DMX%20Profile%20Specification%20V2.0.pdf`
+  - `MT%20Pro/All%20Files/MT-Pro-DMX-Profile-Specification-V1.2.pdf`
+  - `NovaP300c-P600c/All%20Files/Nova-P300c-DMX-Profile-Specification-V1.1.pdf`
+  - `NovaP300c-P600c/P600c%20All%20Files/Nova-P600c-DMX-Profile-Specification-V1.1.1.pdf`
+  - `LS%20600c%20Pro%20II/Documents/LS600c%20Pro%20%26%20LS600c%20Pro%20II%20DMX%20Profile%20Specification%20V1.6.pdf`
+  - `LS%20600x%20Pro/All%20Files/LS600X-Pro-DMX-Profile-Specification-V1.0-.pdf`
+  - `LS%20600d%20Pro/All%20Files/LS-600d-Pro-DMX-Profile-Specification-V1.0-.pdf`
+  - `LS%20300d%20II/All%20files/LS-600d-Pro-LS-300d-II-common-DMX-Profile-Specification-V1.0.pdf`
+  - `LS%20600d/All%20files/LS-600d-DMX-Profile-Specification-V1.0-.pdf`
+  - `LS%201200d%20Pro/All%20Files/LS1200D-Pro-DMX-Profile-Specification-V1.0-.pdf`
+  - `STORM%2080c/manuals/STORM%201000c%20%26%2080c%20DMX%20Profile%20Specification%20V1.3.pdf`
+  - `STORM%201200x/documents/STORM%201200x%20DMX%20Profile%20Specification%20V1.5.pdf`
+  - `Electro%20Storm%20XT26/Electro%20Storm%20XT26%20DMX%20Profile%20Specification%20V1.1.pdf`
+  - `Electro%20Storm%20CS15/Electro%20Storm%20CS15%20DMX%20Profile%20Specification%20V1.1.pdf`
+  - `LS%20300x/All%20files/LS_300x-Product_Manual_EN.pdf` (manual containing the DMX chart)
+
+**Official amaran DMX specs:**
+- Base: https://cdn.shopify.com/s/files/1/0862/5432/1947/files/
+- Files under it:
+  - `amaran-PT-DMX-Profile-Specification-V1.0_fc68031c-c061-43a9-930c-a9e77ffc0fe1.pdf?v=1714345028`
+  - `amaran-PT-Product-Manual-V1.2-0207.pdf`
+  - `T2C-T4C-DMX-Profile-Specification-V1.1.pdf?v=1739938087`
+  - `T2C-Manual-EN_220316.pdf`
+  - `F21C-F22C-DMX-Profile-Specification-V1.0.pdf?v=1714261743`
+  - `F21X-F22X-Pro-DMX-Profile-Specification-V1.0.pdf`
+  - `amaran_DMX_V1.2_EN.pdf?v=1793844618`
+  - `amaranHalo_DMXProfile_CN_V1.1_260303.pdf?v=1772650840`
+  - `amaranRay360c660c_DMXProfile_CN_V1.0.pdf?v=1764889016`
+
+**Help centre:**
+- https://help.aputure.com/en/amaran-pixel-tubes/dmx-profile-settings
+- https://help.aputure.com/en/infinibar/dmx-profiles-settings
+- https://help.aputure.com/en/mt-pro/dmx-profiles-settings
+- https://help.aputure.com/en/amaran-tube/menu-options
+- https://help.aputure.com/en/amaran-flexible-lights/dmx-profiles-and-settings
+- https://help.aputure.com/en/nova-p600c-p300c/wired-dmx-controlsettings
+- https://help.aputure.com/en/ls600c-pro/lighting-configuration-settings
+- https://help.aputure.com/en/ls-600c-pro-ii/lighting-configuration-settings
+- https://help.aputure.com/en/which-amaran-lights-can-i-control-with-dmx-which-adapters-are-needed-for-each-fixture
+- https://help.aputure.com/en/lighting-console-profiles-download
+- https://help.amarancreators.com/en/amaran-halo-60x-100x/operation-and-controls
+
+**Console and fixture libraries:**
+- grandMA pack: https://help.aputure.com/hubfs/Knowledge%20Base/company%20files/grandMA%20Files/Aputure%20Fixture%20Profiles%20for%20grandMA-%205-24-224.zip
+- Lightkey: https://lightkeyapp.com/en/fixtures/download?m=Aputure&f=Amaran%20PT (likewise `Infinibar`, `MT%20Pro`, `T2C%20%26%20T4C`, `F21C%20%26%20F22C`, `Nova%20P300c%20(Firmware%20v1.8)`, `Nova%20P600c`)
+- OFL: https://raw.githubusercontent.com/OpenLightingProject/open-fixture-library/master/fixtures/aputure/ (nova-p300c, ls-600x-pro, ls-600d-pro, ls-c300d-ii, ls-300x, …)

@@ -1396,7 +1396,8 @@ final class ModernTranscriber {
         // 4. Analyzer fed by an AsyncStream.
         let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
         let analyzer = SpeechAnalyzer(modules: modules,
-                                      options: .init(priority: .userInitiated, modelRetention: .lingering))
+                                      options: SpeechAnalyzer.Options(priority: .userInitiated,
+                                                                      modelRetention: .lingering))
         try await analyzer.prepareToAnalyze(in: analyzerFormat)
         if !contextualStrings.isEmpty {
             let context = AnalysisContext()

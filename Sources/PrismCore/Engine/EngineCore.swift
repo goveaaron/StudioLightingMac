@@ -6,6 +6,13 @@ public struct EngineStats: Sendable, Equatable {
     public var measuredFPS: Double = 0
     public var lastFrameDurationMs: Double = 0
     public var maxFrameDurationMs: Double = 0
+
+    public init(framesRendered: UInt64 = 0, measuredFPS: Double = 0, lastFrameDurationMs: Double = 0, maxFrameDurationMs: Double = 0) {
+        self.framesRendered = framesRendered
+        self.measuredFPS = measuredFPS
+        self.lastFrameDurationMs = lastFrameDurationMs
+        self.maxFrameDurationMs = maxFrameDurationMs
+    }
 }
 
 /// The real-time engine. Renders frames at a fixed rate on its own high-priority queue and
