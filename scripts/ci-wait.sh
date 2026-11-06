@@ -4,7 +4,7 @@
 # Usage: scripts/ci-wait.sh [branch] [sha]
 #   defaults: current branch, HEAD
 # Also downloads screenshot artifacts to /tmp/prism-ci/<run-id>/ when available.
-# Exit status: 0 = green, 1 = failed, 2 = no run found.
+# Exit status: 0 = green, 1 = failed, 2 = no run found, 3 = cancelled (superseded).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 GH=/opt/antigravity/bin/gh
@@ -38,6 +38,10 @@ OUTDIR="/tmp/prism-ci/$RUN"
 mkdir -p "$OUTDIR"
 $GH run download -R "$REPO" "$RUN" -D "$OUTDIR" >/dev/null 2>&1 && echo "Artifacts: $OUTDIR" || true
 
+if [[ "$CONCLUSION" == "cancelled" ]]; then
+  echo "Run was cancelled (superseded by a newer push to $BRANCH) — check the newer run."
+  exit 3
+fi
 if [[ "$CONCLUSION" != "success" ]]; then
   echo "---- failure excerpt ----"
   $GH run view -R "$REPO" "$RUN" --log-failed 2>/dev/null \

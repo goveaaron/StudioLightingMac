@@ -12,7 +12,8 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Agent branches: newer pushes supersede older runs. main: every landing gets a full run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: write
@@ -29,7 +30,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: .build
           key: linux-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
@@ -38,6 +39,11 @@ jobs:
         run: swift build --build-tests
       - name: Test
         run: swift test --skip-build
+      - uses: actions/cache/save@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: .build
+          key: linux-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
 
   macos:
     name: macOS · app
@@ -50,7 +56,7 @@ jobs:
           if [ -d /Applications/Xcode_26.6.app ]; then sudo xcode-select -s /Applications/Xcode_26.6.app; fi
           swift --version
           sw_vers
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: .build
           key: macos-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
@@ -93,6 +99,61 @@ jobs:
           name: screenshots
           path: ${{ runner.temp }}/shots
           retention-days: 10
+          if-no-files-found: ignore
+      - name: Package debug app for launch tests
+        if: github.ref == 'refs/heads/main'
+        run: ditto -c -k --keepParent dist/Prism.app "$RUNNER_TEMP/Prism-debug.zip"
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: prism-debug-app
+          path: ${{ runner.temp }}/Prism-debug.zip
+          retention-days: 3
+      - uses: actions/cache/save@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: .build
+          key: macos-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
+
+  # The app is built on macOS 26 with a macOS 14 deployment target: make sure it really
+  # launches and passes its self-test on older systems (weak-linked frameworks etc.).
+  launch-older-macos:
+    name: Launch · ${{ matrix.os }}
+    needs: macos
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: prism-debug-app
+          path: ${{ runner.temp }}
+      - name: Unpack
+        run: ditto -x -k "$RUNNER_TEMP/Prism-debug.zip" dist && sw_vers
+      - name: Self-test
+        run: scripts/mac-timeout.sh 300 dist/Prism.app/Contents/MacOS/Prism --self-test
+      - name: Screenshot tour
+        if: success() || failure()
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          scripts/mac-timeout.sh 900 dist/Prism.app/Contents/MacOS/Prism --screenshot-tour "$RUNNER_TEMP/shots"
+      - name: Crash reports
+        if: failure()
+        run: |
+          find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name 'Prism*' -mmin -60 2>/dev/null | while read -r f; do
+            echo "===== $f"; head -c 12000 "$f"; echo
+          done
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: screenshots-${{ matrix.os }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 5
           if-no-files-found: ignore
 
   release:

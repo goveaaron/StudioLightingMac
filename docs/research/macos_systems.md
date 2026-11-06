@@ -1492,11 +1492,13 @@ What to do instead:
    ```swift
    // Package.swift (target PrismServer)
    resources: [.embedInCode("Web/index.html"), .embedInCode("Web/app.js")]
-   // generated: enum/struct PackageResources { static let index_html: [UInt8]; static let app_js: [UInt8] }
+   // generated: struct PackageResources { static let index_html: [UInt8]; static let app_js: [UInt8] }
    let html = Data(PackageResources.index_html)
    ```
    You must list individual files (no directories). The identifier is the file name with
-   non-identifier characters turned into `_`. Very large files slow compilation.
+   non-identifier characters turned into `_`. Very large files slow compilation. Both build systems
+   generate the same `struct PackageResources` ✅ (SwiftPM `LLBuildManifest.swift`, swift-build
+   `GenerateEmbedInCodeAccessorTaskAction.swift`), so this keeps working if the default changes.
 2. **App images and sounds:** use SF Symbols or code-drawn assets. Alternatively, ship `.copy`
    resources and use your own accessor that never calls `fatalError`. Have the bundling script copy
    `*.bundle` into `Contents/Resources`:
@@ -1706,8 +1708,9 @@ ditto -x -k "$TMP/Prism.zip" "$TMP"
 
 if pgrep -xq Prism; then
   echo "Quitting running Prism…"
-  pkill -x Prism || true          # Prism should handle SIGTERM by saving & terminating (see §9)
-  sleep 2
+  pkill -x Prism || true          # Prism turns SIGTERM into a normal quit: save, blackout (§9.3)
+  for _ in $(seq 1 20); do pgrep -xq Prism || break; sleep 0.5; done
+  if pgrep -xq Prism; then echo "Prism is still running. Quit it and run the installer again." >&2; exit 1; fi
 fi
 rm -rf "$DEST/Prism.app"
 ditto "$TMP/Prism.app" "$DEST/Prism.app"
@@ -2137,12 +2140,21 @@ Notes:
   are not supported**, so the remote must use WebSockets or polling. There is a limit of about **200
   in-flight requests** (HTTP 429 beyond that), no uptime guarantee, and Cloudflare positions it for
   testing/development.
-- Quick tunnels don't work when `~/.cloudflared/config.yaml` exists (documented caveat ⚠️ wording).
-  Detect that file and warn the user.
+- Older Cloudflare docs said quick tunnels don't start when `~/.cloudflared/config.yaml` exists. The
+  current page no longer says so ⚠️. Detect that file anyway and warn the user if the tunnel fails.
 - cloudflared tries QUIC (UDP 7844) first and falls back to HTTP/2 (TCP 7844). On networks that block
   this, add `--protocol http2`.
 - The tunnel is **public**. Anyone who learns the URL can reach the server, so always require the
   random token (§5.2).
+- **Optional email gate (cloudflared ≥ 2026.9.3):** `--allowed-mail you@example.com` (repeatable,
+  comma-separated, or `'*@example.com'`). Visitors get a Cloudflare Access one-time PIN by email
+  before any request reaches the Mac. Neither side needs a Cloudflare account. The session lasts up to
+  4 h and ends when cloudflared exits. It only works in an interactive browser, so a phone opening the
+  remote page is fine. The page's WebSocket should carry the session cookie (same origin) but this is
+  not tested ⚠️. Offer it as a "protect remote with my email" setting and keep the token check
+  anyway.
+- `--output json` turns every log line into a JSON object (Cloudflare blog, 2026-10-02). The JSON keys
+  aren't documented ⚠️. The URL regex in 7.3 matches inside JSON lines too, so either mode works.
 
 ### 7.2 Downloads and checksums ✅ (verified by downloading the arm64 asset)
 

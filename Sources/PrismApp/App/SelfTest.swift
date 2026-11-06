@@ -40,8 +40,24 @@ enum SelfTest {
                 return s.measuredFPS > app.engine.frameRate * 0.75 ? nil : "Engine at \(s.measuredFPS) fps"
             },
             Check(name: "engine.frameBudget") { app in
-                let s = app.engine.stats
-                return s.maxFrameDurationMs < 8 ? nil : "Slow frame: \(s.maxFrameDurationMs) ms"
+                // Measure the renderer directly (the live max includes app-launch hiccups).
+                let snapshot = app.engine.currentSnapshot
+                var durations: [Double] = []
+                let start = PrismClock.now()
+                for i in 0..<120 {
+                    let t0 = PrismClock.now()
+                    _ = EngineCore.renderFrame(snapshot, time: start + Double(i) / 40)
+                    durations.append((PrismClock.now() - t0) * 1000)
+                }
+                durations.sort()
+                let median = durations[durations.count / 2]
+                let p95 = durations[min(durations.count - 1, Int(Double(durations.count) * 0.95))]
+                #if DEBUG
+                let budget = 15.0   // unoptimized build
+                #else
+                let budget = 4.0
+                #endif
+                return p95 < budget ? nil : String(format: "Frame p95 %.2f ms (median %.2f ms), budget %.0f ms", p95, median, budget)
             },
             Check(name: "look.recall.dmx") { app in
                 guard let look = app.show.looks.first(where: { $0.name == "Chill Vibes 4" }) else { return "Demo look missing" }
