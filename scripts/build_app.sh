@@ -9,6 +9,8 @@
 #   --out        output directory (default ./dist)
 #   --sign-identity NAME  codesign identity (default $PRISM_SIGN_IDENTITY; keychain from
 #                $PRISM_SIGN_KEYCHAIN). Falls back to ad-hoc when missing or unusable.
+#   --sanitize KIND  build with a sanitizer (thread | address | undefined; not with --universal).
+#                Nightly CI runs the self-test and tour on such builds.
 # Result: <out>/Prism.app, signed with the stable Prism identity when available, else ad-hoc.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,6 +22,7 @@ BUILD="${PRISM_BUILD:-0}"
 OUT=dist
 SIGN_IDENTITY="${PRISM_SIGN_IDENTITY:-}"
 SIGN_KEYCHAIN="${PRISM_SIGN_KEYCHAIN:-}"
+SANITIZE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --release) CONFIG=release ;;
@@ -28,7 +31,8 @@ while [[ $# -gt 0 ]]; do
     --build) BUILD="$2"; shift ;;
     --out) OUT="$2"; shift ;;
     --sign-identity) SIGN_IDENTITY="$2"; shift ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    --sanitize) SANITIZE="$2"; shift ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "build_app.sh: unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -38,12 +42,16 @@ if [[ "$(uname)" != "Darwin" ]]; then
   echo "build_app.sh must run on macOS" >&2
   exit 1
 fi
+if [[ -n "$SANITIZE" && $UNIVERSAL == 1 ]]; then
+  echo "build_app.sh: --sanitize can't be combined with --universal" >&2
+  exit 2
+fi
 
 APP="$OUT/Prism.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-echo "==> Building Prism ($CONFIG, universal=$UNIVERSAL)"
+echo "==> Building Prism ($CONFIG, universal=$UNIVERSAL${SANITIZE:+, sanitize=$SANITIZE})"
 if [[ $UNIVERSAL == 1 ]]; then
   bins=()
   for arch in arm64 x86_64; do
@@ -53,8 +61,8 @@ if [[ $UNIVERSAL == 1 ]]; then
   done
   lipo -create "${bins[@]}" -output "$APP/Contents/MacOS/Prism"
 else
-  swift build -c "$CONFIG" --product Prism
-  cp "$(swift build -c "$CONFIG" --show-bin-path)/Prism" "$APP/Contents/MacOS/Prism"
+  swift build -c "$CONFIG" --product Prism ${SANITIZE:+--sanitize="$SANITIZE"}
+  cp "$(swift build -c "$CONFIG" ${SANITIZE:+--sanitize="$SANITIZE"} --show-bin-path)/Prism" "$APP/Contents/MacOS/Prism"
 fi
 chmod +x "$APP/Contents/MacOS/Prism"
 

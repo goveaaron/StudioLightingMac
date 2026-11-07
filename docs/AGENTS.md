@@ -51,7 +51,8 @@ scripts/ci-wait.sh agent/<name>     # blocks until done; prints errors; exit 0 =
 3 cancelled (superseded by a newer push) · **4 still running — just run it again**. Background
 commands on this VM are killed after 10 minutes, so the script gives up waiting after ~9 minutes
 with exit 4 rather than dying silently. Pass a full or short SHA as the 2nd argument to wait for a
-specific commit (e.g. `scripts/ci-wait.sh main <sha>` after landing).
+specific commit (e.g. `scripts/ci-wait.sh main <sha>` after landing). Commits that only touch
+`docs/**` or root-level `*.md` files don't trigger CI at all (ci-wait then exits 2; that's fine).
 
 `ci-wait.sh` downloads the screenshot artifact to `/tmp/prism-ci/<run-id>/screenshots/`.
 **Look at the PNGs with the file viewer.** That is the only way to see the UI. Judge them
@@ -89,6 +90,13 @@ Land small, green increments often (at least at every milestone):
 If `main` is red because of someone else, tell the orchestrator; fix it yourself only if
 it's clearly in your area or trivial.
 
+**Releases are the orchestrator's job** (`gh workflow run ci.yml --ref main -f release=true`,
+optional `-f version=1.2.3`, `-f prerelease=true`). The run tags the commit first, builds the
+universal signed app, publishes it as a pre-release, installs it with the real curl one-liner on
+Apple silicon and Intel, and only then makes it the release the installer downloads. Don't
+change `.github/workflows/*` yourself — besides being shared, a workflow change on `main` while
+a release run is starting stops GitHub from letting Actions tag the release commit.
+
 ## 4. Ownership
 
 Each agent owns specific directories (listed in your brief). You may freely edit files you
@@ -105,6 +113,12 @@ Need a bigger change in someone else's area? Message the orchestrator.
   no `try!`, no `fatalError`, no unchecked indexing, never block main or the engine.
 - Portable logic goes in `PrismCore` with XCTest tests in `Tests/PrismCoreTests/`
   (one file per area, e.g. `EffectsTests.swift`). Aim for meaningful coverage of edge cases.
+- **Timing-sensitive tests** (frame budgets, throughput) must have `Budget` or `Performance` in
+  their test name. The nightly workflow (`.github/workflows/nightly.yml`) runs every test, plus
+  the app's self-test and tour, under Thread and Address Sanitizer, and skips tests matching
+  `Budget|Performance`. App-side timing checks should scale their limits by the
+  `PRISM_PERF_BUDGET_SCALE` environment variable (see `engine.frameBudget` in `SelfTest.swift`).
+  Treat any sanitizer report in your area as a real bug.
 - App features add `SelfTest` checks and `ScreenshotTour` scenes for every screen/state.
 - Preserve existing comments/docstrings. Document public APIs with `///`.
 - No new package dependencies without asking the orchestrator (current: swift-nio only).
