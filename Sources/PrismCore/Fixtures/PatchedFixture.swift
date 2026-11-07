@@ -62,9 +62,23 @@ public struct StageTransform: Codable, Hashable, Sendable {
         self.x = x; self.y = y; self.rotation = rotation; self.scale = scale; self.depth = depth
     }
 
+    /// Positions are bounded to ±1 km so corrupt files can't feed absurd values into spatial math.
     public var sanitized: StageTransform {
-        StageTransform(x: x.finiteOr(0), y: y.finiteOr(0), rotation: wrapDegrees(rotation.finiteOr(0)),
+        StageTransform(x: clamp(x.finiteOr(0), -1000, 1000), y: clamp(y.finiteOr(0), -1000, 1000),
+                       rotation: wrapDegrees(rotation.finiteOr(0)),
                        scale: clamp(scale.finiteOr(1), 0.1, 10), depth: depth.map { clamp01($0.finiteOr(0.5)) })
+    }
+
+    private enum CodingKeys: String, CodingKey { case x, y, rotation, scale, depth }
+
+    /// Decodes leniently: missing or corrupt fields use defaults (older files may omit `scale`).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x = c.decodeLenient(Double.self, forKey: .x) ?? 0
+        y = c.decodeLenient(Double.self, forKey: .y) ?? 0
+        rotation = c.decodeLenient(Double.self, forKey: .rotation) ?? 0
+        scale = c.decodeLenient(Double.self, forKey: .scale) ?? 1
+        depth = c.decodeLenient(Double.self, forKey: .depth)
     }
 }
 
@@ -200,15 +214,15 @@ public struct FixtureLimits: Codable, Hashable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let minI = (try c.decodeIfPresent(Double.self, forKey: .minIntensity) ?? 0).finiteOr(0)
-        let maxI = (try c.decodeIfPresent(Double.self, forKey: .maxIntensity) ?? 1).finiteOr(1)
-        let allowFX = try c.decodeIfPresent(Bool.self, forKey: .allowEffects) ?? true
-        let allowStr = try c.decodeIfPresent(Bool.self, forKey: .allowStrobe) ?? true
-        let prot = try c.decodeIfPresent(Bool.self, forKey: .protected) ?? false
-        let minK = try c.decodeIfPresent(Double.self, forKey: .minKelvin)
-        let maxK = try c.decodeIfPresent(Double.self, forKey: .maxKelvin)
-        let curve = try c.decodeIfPresent(DimmerCurve.self, forKey: .dimmerCurve) ?? .linear
-        let neverOff = try c.decodeIfPresent(Bool.self, forKey: .neverFullyOffUnlessZero) ?? false
+        let minI = (c.decodeLenient(Double.self, forKey: .minIntensity) ?? 0).finiteOr(0)
+        let maxI = (c.decodeLenient(Double.self, forKey: .maxIntensity) ?? 1).finiteOr(1)
+        let allowFX = c.decodeLenient(Bool.self, forKey: .allowEffects) ?? true
+        let allowStr = c.decodeLenient(Bool.self, forKey: .allowStrobe) ?? true
+        let prot = c.decodeLenient(Bool.self, forKey: .protected) ?? false
+        let minK = c.decodeLenient(Double.self, forKey: .minKelvin)
+        let maxK = c.decodeLenient(Double.self, forKey: .maxKelvin)
+        let curve = c.decodeLenient(DimmerCurve.self, forKey: .dimmerCurve) ?? .linear
+        let neverOff = c.decodeLenient(Bool.self, forKey: .neverFullyOffUnlessZero) ?? false
         self.init(
             maxIntensity: maxI,
             minIntensity: minI,
@@ -279,14 +293,17 @@ public struct ColorCalibration: Codable, Hashable, Sendable {
         case gamma, gains, accurateColor, whitePointKelvinTrim, whitePointTintTrim, dimmerCurve
     }
 
+    /// Decodes leniently and sanitizes (calibration values feed straight into DMX math).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        gamma = (try c.decodeIfPresent(Double.self, forKey: .gamma) ?? 1).finiteOr(1)
-        gains = try c.decodeIfPresent([String: Double].self, forKey: .gains) ?? [:]
-        accurateColor = try c.decodeIfPresent(Bool.self, forKey: .accurateColor) ?? true
-        whitePointKelvinTrim = (try c.decodeIfPresent(Double.self, forKey: .whitePointKelvinTrim) ?? 0).finiteOr(0)
-        whitePointTintTrim = clamp((try c.decodeIfPresent(Double.self, forKey: .whitePointTintTrim) ?? 0).finiteOr(0), -1, 1)
-        dimmerCurve = try c.decodeIfPresent(DimmerCurve.self, forKey: .dimmerCurve)
+        self = ColorCalibration(
+            gamma: c.decodeLenient(Double.self, forKey: .gamma) ?? 1,
+            gains: c.decodeLenient([String: Double].self, forKey: .gains) ?? [:],
+            accurateColor: c.decodeLenient(Bool.self, forKey: .accurateColor) ?? true,
+            whitePointKelvinTrim: c.decodeLenient(Double.self, forKey: .whitePointKelvinTrim) ?? 0,
+            whitePointTintTrim: c.decodeLenient(Double.self, forKey: .whitePointTintTrim) ?? 0,
+            dimmerCurve: c.decodeLenient(DimmerCurve.self, forKey: .dimmerCurve)
+        ).sanitized
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -304,6 +321,20 @@ public struct ColorCalibration: Codable, Hashable, Sendable {
     }
 
     public static let `default` = ColorCalibration()
+
+    /// Finite values only: gamma 0.2…5, gains 0…4 (at most 32 emitters), white-point trims ±5000 K / ±1 tint.
+    public var sanitized: ColorCalibration {
+        var g: [String: Double] = [:]
+        for (k, v) in gains.prefix(32) { g[String(k.prefix(32))] = clamp(v.finiteOr(1), 0, 4) }
+        return ColorCalibration(
+            gamma: clamp(gamma.finiteOr(1), 0.2, 5),
+            gains: g,
+            accurateColor: accurateColor,
+            whitePointKelvinTrim: clamp(whitePointKelvinTrim.finiteOr(0), -5000, 5000),
+            whitePointTintTrim: clamp(whitePointTintTrim.finiteOr(0), -1, 1),
+            dimmerCurve: dimmerCurve
+        )
+    }
 }
 
 /// A light placed in the project: which model/mode it is, where it is in DMX space and on stage.
@@ -347,28 +378,36 @@ public struct PatchedFixture: Codable, Hashable, Sendable, Identifiable {
              calibration, reversePixels, locked, hidden, notes, tags
     }
 
+    /// Decodes defensively: each field falls back to a safe default so one corrupt value never
+    /// drops the light from the rig. Only an entry without a usable `definitionID` is rejected
+    /// (it isn't a light at all; the project decoder drops and reports it).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Light"
-        shortName = try c.decodeIfPresent(String.self, forKey: .shortName) ?? ""
-        definitionID = try c.decodeIfPresent(String.self, forKey: .definitionID) ?? "generic.dimmer"
-        modeName = try c.decodeIfPresent(String.self, forKey: .modeName) ?? ""
-        universe = clamp(try c.decodeIfPresent(Int.self, forKey: .universe) ?? 1, 1, 64)
-        if let a = try c.decodeIfPresent(Int.self, forKey: .address) {
+        guard let defID = c.decodeLenient(String.self, forKey: .definitionID)?
+                .trimmingCharacters(in: .whitespacesAndNewlines), !defID.isEmpty else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Fixture has no definitionID."))
+        }
+        id = c.decodeLenient(UUID.self, forKey: .id) ?? UUID()
+        name = String((c.decodeLenient(String.self, forKey: .name) ?? "Light").prefix(200))
+        shortName = String((c.decodeLenient(String.self, forKey: .shortName) ?? "").prefix(32))
+        definitionID = defID
+        modeName = c.decodeLenient(String.self, forKey: .modeName) ?? ""
+        universe = clamp(c.decodeLenient(Int.self, forKey: .universe) ?? 1, 1, 64)
+        if let a = c.decodeLenient(Int.self, forKey: .address) {
             address = (1...512).contains(a) ? a : nil
         } else {
             address = nil
         }
-        role = try c.decodeIfPresent(FixtureRole.self, forKey: .role) ?? .other
-        transform = (try c.decodeIfPresent(StageTransform.self, forKey: .transform) ?? StageTransform()).sanitized
-        limits = try c.decodeIfPresent(FixtureLimits.self, forKey: .limits) ?? .default
-        calibration = try c.decodeIfPresent(ColorCalibration.self, forKey: .calibration) ?? .default
-        reversePixels = try c.decodeIfPresent(Bool.self, forKey: .reversePixels) ?? false
-        locked = try c.decodeIfPresent(Bool.self, forKey: .locked) ?? false
-        hidden = try c.decodeIfPresent(Bool.self, forKey: .hidden) ?? false
-        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
-        tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
+        role = c.decodeLenient(FixtureRole.self, forKey: .role) ?? .other
+        transform = (c.decodeLenient(StageTransform.self, forKey: .transform) ?? StageTransform()).sanitized
+        limits = c.decodeLenient(FixtureLimits.self, forKey: .limits) ?? .default
+        calibration = c.decodeLenient(ColorCalibration.self, forKey: .calibration) ?? .default
+        reversePixels = c.decodeLenient(Bool.self, forKey: .reversePixels) ?? false
+        locked = c.decodeLenient(Bool.self, forKey: .locked) ?? false
+        hidden = c.decodeLenient(Bool.self, forKey: .hidden) ?? false
+        notes = c.decodeLenient(String.self, forKey: .notes) ?? ""
+        tags = Array((c.decodeLenient([String].self, forKey: .tags) ?? []).prefix(64))
     }
 
     /// Label for the stage: shortName if set, else name.
@@ -393,6 +432,26 @@ public struct FixtureGroup: Codable, Hashable, Sendable, Identifiable {
 
     public init(id: UUID = UUID(), name: String, fixtureIDs: [UUID], colorHex: String? = nil) {
         self.id = id; self.name = name; self.fixtureIDs = fixtureIDs; self.colorHex = colorHex
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, fixtureIDs, colorHex }
+
+    /// Decodes defensively: corrupt member ids are skipped and missing fields default.
+    /// Only an entry with neither a name nor members is rejected.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedName = c.decodeLenient(String.self, forKey: .name)
+        let members = c.decodeTolerantArray(UUID.self, forKey: .fixtureIDs, limit: Project.maxFixtures)?.values
+        guard decodedName != nil || members != nil else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Group has neither a name nor members."))
+        }
+        id = c.decodeLenient(UUID.self, forKey: .id) ?? UUID()
+        let trimmed = (decodedName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        name = trimmed.isEmpty ? "Group" : String(trimmed.prefix(200))
+        var seen = Set<UUID>()
+        fixtureIDs = (members ?? []).filter { seen.insert($0).inserted }
+        colorHex = c.decodeLenient(String.self, forKey: .colorHex).map { String($0.prefix(16)) }
     }
 }
 

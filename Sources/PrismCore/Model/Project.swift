@@ -208,6 +208,15 @@ public struct LiveState: Hashable, Sendable {
         fadeProgress(at: time) != nil
     }
 
+    /// End time of the last fade still running at `time`, or `nil` when nothing is fading.
+    public func activeFadeEndTime(at time: Double) -> Double? {
+        var end: Double?
+        for f in fades.values where !f.isFinished(at: time) { end = max(end ?? f.endTime, f.endTime) }
+        for ef in effectFades.values where !ef.isFinished(at: time) { end = max(end ?? ef.endTime, ef.endTime) }
+        if let mf = musicFade, !mf.isFinished(at: time) { end = max(end ?? mf.endTime, mf.endTime) }
+        return end
+    }
+
     public func remainingFadeTime(at time: Double) -> Double {
         var maxEnd = time
         for f in fades.values where !f.isFinished(at: time) { maxEnd = max(maxEnd, f.endTime) }
@@ -246,20 +255,12 @@ public struct LiveSnapshot: Codable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         base = (try? c.decodeIfPresent(FixtureStateMap.self, forKey: .base)) ?? FixtureStateMap()
         activeLookID = try? c.decodeIfPresent(UUID.self, forKey: .activeLookID)
-        effects = (try? c.decodeIfPresent([EffectInstance].self, forKey: .effects)) ?? []
+        effects = c.decodeTolerantArray(EffectInstance.self, forKey: .effects, limit: Look.maxEffects)?.values ?? []
         var m = (try? c.decodeIfPresent(MusicModeSettings.self, forKey: .music)) ?? MusicModeSettings()
         m.enabled = false // never auto-start music mode when opening a file
         music = m
         grandMaster = clamp01(((try? c.decodeIfPresent(Double.self, forKey: .grandMaster)) ?? 1).finiteOr(1))
         recordingMode = (try? c.decodeIfPresent(Bool.self, forKey: .recordingMode)) ?? false
-    }
-}
-
-/// Helper wrapper to decode array elements tolerantly without failing the entire array when one element is corrupt.
-private struct TolerantElement<T: Decodable>: Decodable {
-    let value: T?
-    init(from decoder: Decoder) throws {
-        value = try? T(from: decoder)
     }
 }
 
@@ -312,13 +313,28 @@ public struct Project: Codable, Hashable, Sendable {
              lastLive, notes, createdAt, modifiedAt, appVersion
     }
 
+    /// Upper bounds for collections read from files (far above any real studio; protects the engine
+    /// and UI from hostile or corrupt files).
+    public static let maxFixtures = 4096
+    public static let maxLooks = 10_000
+    public static let maxGroups = 2000
+    public static let maxFolders = 2000
+    public static let maxDefinitions = 2000
+
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         var fixes: [String] = []
 
-        if let fv = try c.decodeIfPresent(Int.self, forKey: .formatVersion) {
+        // A JSON object with none of our keys is some other file, not a (corrupt) project.
+        let signatureKeys: [CodingKeys] = [.formatVersion, .version, .id, .fixtures, .looks, .stage, .definitions]
+        guard signatureKeys.contains(where: { c.contains($0) }) else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "No Prism project keys found."))
+        }
+
+        if let fv = c.decodeLenient(Int.self, forKey: .formatVersion) {
             formatVersion = fv
-        } else if let v = try c.decodeIfPresent(Int.self, forKey: .version) {
+        } else if let v = c.decodeLenient(Int.self, forKey: .version) {
             formatVersion = v
         } else {
             formatVersion = 1
@@ -333,30 +349,29 @@ public struct Project: Codable, Hashable, Sendable {
 
         if let decodedName = try? c.decodeIfPresent(String.self, forKey: .name) {
             let trimmed = decodedName.trimmingCharacters(in: .whitespacesAndNewlines)
-            name = trimmed.isEmpty ? "Untitled" : trimmed
+            name = trimmed.isEmpty ? "Untitled" : String(trimmed.prefix(200))
         } else {
             name = "Untitled"
             if c.contains(.name) { fixes.append("Repaired corrupt project name.") }
         }
 
-        func decodeArray<T: Decodable>(_ key: CodingKeys, label: String) -> [T] {
+        func decodeArray<T: Decodable>(_ key: CodingKeys, label: String, limit: Int) -> [T] {
             guard c.contains(key) else { return [] }
-            if let direct = try? c.decodeIfPresent([T].self, forKey: key) { return direct }
-            if let tolerant = try? c.decode([TolerantElement<T>].self, forKey: key) {
-                let valid = tolerant.compactMap(\.value)
-                let dropped = tolerant.count - valid.count
-                if dropped > 0 { fixes.append("Repaired \(dropped) corrupt entr\(dropped == 1 ? "y" : "ies") in \(label).") }
-                return valid
+            guard let decoded = c.decodeTolerantArray(T.self, forKey: key, limit: limit) else {
+                fixes.append("Repaired corrupt \(label) section.")
+                return []
             }
-            fixes.append("Repaired corrupt \(label) section.")
-            return []
+            if decoded.dropped > 0 {
+                fixes.append("Repaired \(decoded.dropped) corrupt entr\(decoded.dropped == 1 ? "y" : "ies") in \(label).")
+            }
+            return decoded.values
         }
 
-        fixtures = decodeArray(.fixtures, label: "fixtures")
-        groups = decodeArray(.groups, label: "groups")
-        looks = decodeArray(.looks, label: "looks")
-        folders = decodeArray(.folders, label: "folders")
-        definitions = decodeArray(.definitions, label: "definitions")
+        fixtures = decodeArray(.fixtures, label: "fixtures", limit: Project.maxFixtures)
+        groups = decodeArray(.groups, label: "groups", limit: Project.maxGroups)
+        looks = decodeArray(.looks, label: "looks", limit: Project.maxLooks)
+        folders = decodeArray(.folders, label: "folders", limit: Project.maxFolders)
+        definitions = decodeArray(.definitions, label: "definitions", limit: Project.maxDefinitions)
 
         if c.contains(.stage) {
             if let s = try? c.decodeIfPresent(StageSettings.self, forKey: .stage) {
@@ -463,9 +478,22 @@ public struct Project: Codable, Hashable, Sendable {
     /// Resolves every fixture against embedded definitions (and an optional external library
     /// lookup). Fixtures whose definition/mode cannot be found are skipped.
     public func resolvedFixtures(library: ((String) -> FixtureDefinition?)? = nil) -> [ResolvedFixture] {
-        fixtures.compactMap { f in
-            guard let def = definition(f.definitionID) ?? library?(f.definitionID),
-                  let mode = def.mode(named: f.modeName) ?? def.recommendedMode else { return nil }
+        var embedded: [String: FixtureDefinition] = [:]
+        embedded.reserveCapacity(definitions.count)
+        for d in definitions where embedded[d.id] == nil { embedded[d.id] = d }
+        var fromLibrary: [String: FixtureDefinition?] = [:]
+        return fixtures.compactMap { f in
+            var def = embedded[f.definitionID]
+            if def == nil, let library {
+                if let cached = fromLibrary[f.definitionID] {
+                    def = cached
+                } else {
+                    let looked = library(f.definitionID)
+                    fromLibrary[f.definitionID] = .some(looked)
+                    def = looked
+                }
+            }
+            guard let def, let mode = def.mode(named: f.modeName) ?? def.recommendedMode else { return nil }
             return ResolvedFixture(fixture: f, definition: def, mode: mode)
         }
     }

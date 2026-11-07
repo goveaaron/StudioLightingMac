@@ -12,9 +12,13 @@ on:
         type: boolean
         default: false
       prerelease:
-        description: Mark it as a pre-release (the installer keeps using the latest full release)
+        description: Keep it a pre-release (the installer keeps using the latest full release)
         type: boolean
         default: false
+      version:
+        description: Version number, e.g. 1.0.0 (blank = 0.9.<run number>)
+        type: string
+        default: ''
 
 concurrency:
   # Per event type, so a push landing on main can't cancel a pending manual (release) run.
@@ -26,7 +30,7 @@ permissions:
   contents: write
 
 env:
-  PRISM_VERSION: 0.9.${{ github.run_number }}
+  PRISM_VERSION: ${{ inputs.version || format('0.9.{0}', github.run_number) }}
   PRISM_BUILD: ${{ github.run_number }}
 
 jobs:
@@ -169,9 +173,40 @@ jobs:
           retention-days: 5
           if-no-files-found: ignore
 
+  # Releases: tag → build → publish as a pre-release → install-test on real Macs → make it the
+  # release the installer one-liner downloads. The tag is created first thing because GitHub won't
+  # let the Actions token tag a commit whose .github/workflows differ from main's (that would
+  # "create workflows" without the `workflows` permission), and main may change mid-run.
+  release-tag:
+    name: Release · tag
+    if: github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[release]') || inputs.release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Tag v${{ env.PRISM_VERSION }}
+        run: |
+          tag="v$PRISM_VERSION"; R="$GITHUB_REPOSITORY"
+          if ! [[ "$PRISM_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$PRISM_VERSION' should look like 1.2.3"; exit 1
+          fi
+          if gh release view "$tag" -R "$R" >/dev/null 2>&1; then
+            echo "::error::$tag is already published. Pick a new version."; exit 1
+          fi
+          if existing=$(gh api "repos/$R/git/ref/tags/$tag" -q .object.sha 2>/dev/null); then
+            if [ "$existing" = "$GITHUB_SHA" ]; then echo "$tag already points at this commit"; exit 0; fi
+            echo "::error::Tag $tag already exists on another commit ($existing). Pick a new version."; exit 1
+          fi
+          if ! gh api -X POST "repos/$R/git/refs" -f ref="refs/tags/$tag" -f sha="$GITHUB_SHA" >/dev/null; then
+            echo "::error::Couldn't create $tag. If .github/workflows changed on main after this commit, run the release again on the latest main."
+            exit 1
+          fi
+          echo "Tagged $GITHUB_SHA as $tag"
+
   release:
-    name: Release
-    needs: [linux, macos]
+    name: Release · build & publish
+    needs: [release-tag, linux, macos]
     if: github.ref == 'refs/heads/main' && (contains(github.event.head_commit.message, '[release]') || inputs.release)
     runs-on: macos-26
     timeout-minutes: 60
@@ -200,10 +235,10 @@ jobs:
           cd dist
           ditto -c -k --sequesterRsrc --keepParent Prism.app Prism.zip
           shasum -a 256 Prism.zip | tee Prism.zip.sha256
-      - name: Publish
+      - name: Publish (as a pre-release until the install test passes)
         env:
           GH_TOKEN: ${{ github.token }}
-          PRERELEASE: ${{ inputs.prerelease && 'true' || 'false' }}
+          TITLE_SUFFIX: ${{ inputs.prerelease && ' (preview)' || '' }}
         run: |
           cat > "$RUNNER_TEMP/notes.md" <<EOF
           Install or update on your Mac by pasting this into Terminal:
@@ -214,13 +249,8 @@ jobs:
 
           Universal app (Apple silicon + Intel), macOS 14 Sonoma or newer.
           EOF
-          if [ "$PRERELEASE" = "true" ]; then
-            flags=(--prerelease --title "Prism $PRISM_VERSION (preview)")
-          else
-            flags=(--latest --title "Prism $PRISM_VERSION")
-          fi
-          gh release create "v$PRISM_VERSION" dist/Prism.zip dist/Prism.zip.sha256 \
-            --target "$GITHUB_SHA" "${flags[@]}" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release create "v$PRISM_VERSION" dist/Prism.zip dist/Prism.zip.sha256 --verify-tag \
+            --prerelease --title "Prism $PRISM_VERSION$TITLE_SUFFIX" --notes-file "$RUNNER_TEMP/notes.md"
 
   # Install the just-published release exactly the way a user would (the curl one-liner), on
   # Apple silicon and on Intel, then make sure the installed app is intact and actually runs.
@@ -235,7 +265,7 @@ jobs:
     timeout-minutes: 25
     env:
       # (the `env` context isn't available here; this is the same value as PRISM_VERSION)
-      PRISM_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/v0.9.${{ github.run_number }}/Prism.zip
+      PRISM_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version || format('0.9.{0}', github.run_number) }}/Prism.zip
       PRISM_NO_OPEN: '1'
     steps:
       - uses: actions/checkout@v4
@@ -253,9 +283,14 @@ jobs:
           codesign -dr - "$APP"
           defaults read "$APP/Contents/Info" CFBundleShortVersionString
           du -sh "$APP"
+      # GitHub's Intel runners are GPU-less VMs where Apple's Metal loader aborts as soon as
+      # anything renders ("Target device architecture is nil"); real Intel Macs have a GPU. There
+      # the GUI steps are informational — install, slices, signature and update still gate.
       - name: Self-test (installed app)
+        continue-on-error: ${{ matrix.os == 'macos-15-intel' }}
         run: scripts/mac-timeout.sh 300 /Applications/Prism.app/Contents/MacOS/Prism --self-test
       - name: Launch like a user and quit
+        continue-on-error: ${{ matrix.os == 'macos-15-intel' }}
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
           open /Applications/Prism.app
@@ -283,3 +318,37 @@ jobs:
           path: ${{ runner.temp }}/shots
           retention-days: 5
           if-no-files-found: ignore
+
+  # Only now does the release become the one the installer one-liner downloads
+  # (releases/latest skips pre-releases), so a build that fails to install never reaches anyone.
+  promote:
+    name: Release · make latest
+    needs: install-test
+    if: ${{ !inputs.prerelease }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Make v${{ env.PRISM_VERSION }} the latest release
+        run: |
+          gh release edit "v$PRISM_VERSION" -R "$GITHUB_REPOSITORY" --prerelease=false --latest
+          gh release view "v$PRISM_VERSION" -R "$GITHUB_REPOSITORY" --json tagName,isPrerelease,url
+
+  # A failed run shouldn't leave a tag without a release behind (it would block re-using the version).
+  release-cleanup:
+    name: Release · clean up after failure
+    needs: [release-tag, release]
+    if: failure() && needs.release-tag.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Remove the unused tag
+        run: |
+          tag="v$PRISM_VERSION"
+          if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag was published; keeping it"; exit 0
+          fi
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag" && echo "Deleted unused tag $tag"

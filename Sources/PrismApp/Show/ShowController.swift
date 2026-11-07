@@ -24,6 +24,12 @@ struct ShowChange: OptionSet {
 ///   - `updateStates(_:...)`     — direct per-fixture edits from the inspector/stage
 ///   - `editProject(_:...)`      — structural edits (patch, layout, looks, groups)
 ///   - `editLive(...)`           — live-only edits (masters, music); undo optional
+///   - `applyPlan(_:origin:undoName:)` — a multi-step plan (assistant) as a single undo step
+///   - `beginInteractiveChange(coalesceKey:)` / `endInteractiveChange()` — wrap a slider, knob or
+///     drag gesture so the whole gesture becomes one undo step
+///
+/// Keep this type lean: feature teams add their convenience helpers as `extension ShowController`
+/// in their own folders, built on the APIs above (never by bypassing them).
 @MainActor
 @Observable
 final class ShowController {
@@ -43,6 +49,9 @@ final class ShowController {
     private(set) var canRedo = false
     private(set) var undoActionName: String?
     private(set) var redoActionName: String?
+    /// Chronological attributed history timeline (most recent first) for the History popover.
+    private(set) var historyTimeline: [UndoHistory.Entry] = []
+    var historyEntries: [UndoHistory.Entry] { historyTimeline }
     /// Problems found when the last project was opened (shown once in the UI).
     var openReport: [String] = []
 
@@ -54,6 +63,9 @@ final class ShowController {
     @ObservationIgnored private var history = UndoHistory()
     @ObservationIgnored private var observers: [UUID: (ShowChange) -> Void] = [:]
     @ObservationIgnored private var autosaveWork: DispatchWorkItem?
+    @ObservationIgnored private var firstUnsavedChangeAt: Double?
+    /// Serial queue for all background persistence so writes never overlap or land out of order.
+    @ObservationIgnored private let persistenceQueue = DispatchQueue(label: "studio.prism.persistence", qos: .utility)
     @ObservationIgnored private var maintenanceTimer: Timer?
     @ObservationIgnored private var resolvedCache: (revision: Int, fixtures: [ResolvedFixture])?
 
@@ -117,7 +129,8 @@ final class ShowController {
 
     func shutdown() {
         maintenanceTimer?.invalidate()
-        autosaveNow()
+        flushAutosave(timeout: 1.0)
+        UserDefaults.standard.removeObject(forKey: Self.restoringAutosaveKey)
     }
 
     private func maintenance() {
@@ -155,9 +168,21 @@ final class ShowController {
         var change: ShowChange = [.live]
         if doc.project.looks != before.project.looks { change.insert(.looks) }
         if doc.project.fixtures != before.project.fixtures { change.insert(.patch) }
-        commit(doc, before: before, undoName: undoName ?? CommandNaming.name(for: commands), coalesceKey: coalesceKey,
-               change: change, marksDirty: change.contains(.looks) || change.contains(.patch))
+        let actionName = undoName ?? CommandNaming.name(for: commands)
+        let summary = result.summary.isEmpty ? actionName : result.summary
+        commit(doc, before: before, undoName: actionName, summary: summary, origin: origin,
+               coalesceKey: coalesceKey, change: change,
+               marksDirty: change.contains(.looks) || change.contains(.patch))
         return result
+    }
+
+    /// Applies a multi-step plan (assistant, Shortcuts…) step by step as a single undo step.
+    @discardableResult
+    func applyPlan(_ steps: [[LightingCommand]], origin: CommandOrigin, undoName: String) -> [CommandResult] {
+        let key = "plan-\(UUID().uuidString)"
+        beginInteractiveChange(coalesceKey: key)
+        defer { endInteractiveChange() }
+        return steps.map { apply($0, origin: origin, undoName: undoName, coalesceKey: key) }
     }
 
     // MARK: Direct edits
@@ -230,9 +255,30 @@ final class ShowController {
         }
     }
 
-    private func commit(_ doc: ShowDocument, before: ShowDocument, undoName: String, coalesceKey: String?,
-                        change: ShowChange, marksDirty: Bool) {
-        history.record(before: before, name: undoName, coalesceKey: coalesceKey, now: PrismClock.now())
+    /// Call when a continuous gesture (slider, knob, drag) begins: every change recorded with
+    /// `coalesceKey` until `endInteractiveChange()` becomes one undo step, even across pauses.
+    func beginInteractiveChange(coalesceKey: String) {
+        history.beginInteraction(key: coalesceKey)
+    }
+
+    /// Call when the gesture ends; the next change starts a new undo step.
+    func endInteractiveChange() {
+        history.endInteraction()
+        syncUndoState()
+    }
+
+    private func commit(_ doc: ShowDocument, before: ShowDocument, undoName: String,
+                        summary: String? = nil, origin: CommandOrigin = .ui,
+                        coalesceKey: String?, change: ShowChange, marksDirty: Bool) {
+        history.record(
+            before: before,
+            after: doc,
+            name: undoName,
+            summary: summary ?? undoName,
+            origin: origin,
+            coalesceKey: coalesceKey,
+            now: PrismClock.now()
+        )
         document = doc
         didChange(change, marksDirty: marksDirty)
     }
@@ -251,6 +297,7 @@ final class ShowController {
         canRedo = history.canRedo
         undoActionName = history.undoName
         redoActionName = history.redoName
+        historyTimeline = history.timeline
     }
 
     /// Sends the current document to the real-time engine (cheap; call after every change).
@@ -260,7 +307,7 @@ final class ShowController {
         engine.update(snapshot)
     }
 
-    // MARK: Undo
+    // MARK: Undo & History Timeline
 
     func undo() {
         guard let r = history.undo(current: document) else { return }
@@ -272,6 +319,13 @@ final class ShowController {
         guard let r = history.redo(current: document) else { return }
         restore(r.document)
         AppModel.shared.ui.toast("Redid \(r.name)", systemImage: "arrow.uturn.forward")
+    }
+
+    /// Reverts the show to the state right before a specific history timeline entry.
+    func revertToHistoryEntry(_ entryID: UUID) {
+        guard let r = history.revertTo(entryID: entryID, current: document) else { return }
+        restore(r.document)
+        AppModel.shared.ui.toast("Reverted to before \(r.name)", systemImage: "clock.arrow.circlepath")
     }
 
     private func restore(_ doc: ShowDocument) {
@@ -410,7 +464,7 @@ final class ShowController {
     // MARK: Project loading / saving
 
     /// Replaces the current project (no undo across projects).
-    func load(_ project: Project, fileURL: URL?, restoreLive: Bool = true) {
+    func load(_ project: Project, fileURL: URL?, restoreLive: Bool = true, additionalFixes: [String] = []) {
         let report = ProjectIO.validate(project)
         var p = report.project
         library.registerEmbedded(p.definitions)
@@ -423,7 +477,9 @@ final class ShowController {
         selection = []
         cellSelection = [:]
         self.fileURL = fileURL
-        openReport = report.fixes
+        var fixes = additionalFixes
+        for fix in report.fixes where !fixes.contains(fix) { fixes.append(fix) }
+        openReport = fixes
         document = ShowDocument(project: p, live: live)
         isDirty = false
         didChange(.all, marksDirty: false)
@@ -438,8 +494,8 @@ final class ShowController {
     }
 
     func open(url: URL) throws {
-        let project = try ProjectIO.read(from: url)
-        load(project, fileURL: url)
+        let report = try ProjectIO.readWithReport(from: url)
+        load(report.project, fileURL: url, additionalFixes: report.fixes)
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
     }
 
@@ -453,11 +509,66 @@ final class ShowController {
     }
 
     func save(to url: URL) throws {
-        try ProjectIO.write(projectForSaving(), to: url, library: library.lookup, appVersion: AppResources.appVersion)
+        let project = projectForSaving()
+        let data = try ProjectIO.data(for: project, library: library.lookup, appVersion: AppResources.appVersion)
+        try ProjectIO.writeAtomic(data, to: url)
         fileURL = url
         isDirty = false
         NSDocumentController.shared.noteNewRecentDocumentURL(url)
+        let backupsRoot = AppResources.backups
+        persistenceQueue.async {
+            do {
+                try ProjectIO.recordBackup(for: project, data: data, backupsRoot: backupsRoot)
+            } catch {
+                NSLog("Prism backup failed: %@", error.localizedDescription)
+            }
+        }
         autosaveNow()
+    }
+
+    /// Backup files of the current project (last 10 saves + hourly snapshots), newest first.
+    func backups() -> [URL] {
+        ProjectIO.listBackups(for: project.id, backupsRoot: AppResources.backups)
+    }
+
+    /// Backups of the current project with their dates and kinds, newest first.
+    func backupEntries() -> [ProjectIO.BackupEntry] {
+        ProjectIO.backupEntries(for: project.id, backupsRoot: AppResources.backups)
+    }
+
+    /// Exports a single look to a `.prismlook` file.
+    func exportLook(_ lookID: UUID, to url: URL) throws {
+        guard let look = project.look(lookID) else { return }
+        try ProjectIO.writeLook(look, from: project, to: url, library: library.lookup)
+    }
+
+    /// Imports a `.prismlook` file into the current project.
+    @discardableResult
+    func importLook(from url: URL, overwriteExistingByName: Bool = false) throws -> Look {
+        let shared = try ProjectIO.readLook(from: url)
+        library.registerEmbedded(shared.definitions)
+        var importedLook = shared.look
+        editProject("Import Look “\(shared.look.name)”", change: [.looks]) { p in
+            importedLook = ProjectIO.importLook(shared, into: &p, overwriteExistingByName: overwriteExistingByName)
+        }
+        return importedLook
+    }
+
+    /// Imports/merges looks from another `.prismlights` project file into the current project.
+    @discardableResult
+    func importLooks(fromProjectURL url: URL, lookIDs: Set<UUID>? = nil, overwriteExistingByName: Bool = false) throws -> [Look] {
+        let source = try ProjectIO.read(from: url)
+        library.registerEmbedded(source.definitions)
+        var imported: [Look] = []
+        editProject("Import Looks", change: [.looks]) { p in
+            imported = ProjectIO.mergeLooks(
+                from: source,
+                into: &p,
+                lookIDs: lookIDs,
+                overwriteExistingByName: overwriteExistingByName
+            )
+        }
+        return imported
     }
 
     func renameProject(_ name: String) {
@@ -468,49 +579,168 @@ final class ShowController {
 
     // MARK: Autosave (crash safety)
 
+    private static let autosaveDebounce = 1.5
+    /// Continuous editing never postpones the autosave longer than this.
+    private static let autosaveMaxDelay = 10.0
+    private static let lastProjectPathKey = "prism.lastProjectPath"
+    /// Whether the latest autosave holds changes that were not saved to the project file.
+    private static let autosaveDirtyKey = "prism.autosaveHasUnsavedChanges"
+    /// Set while a restored autosave is opened and for the first seconds after. If it is still set at the
+    /// next launch, reopening that autosave crashed Prism, so it is set aside instead of reopened.
+    static let restoringAutosaveKey = "prism.restoringAutosave"
+    private static let restoreGuardSeconds = 15.0
+
+    /// The autosave before the latest one (second line of defense if the latest is damaged).
+    static var previousAutosaveURL: URL {
+        let auto = AppResources.autosaveURL
+        return auto.deletingLastPathComponent().appendingPathComponent(auto.lastPathComponent + ".prev")
+    }
+
+    /// Automated runs (self-test, screenshot tour, soak) never touch the user's session files.
+    private var autosaveDisabled: Bool { LaunchOptions.current.isAutomated }
+
     private func scheduleAutosave() {
+        guard !autosaveDisabled else { return }
+        let now = PrismClock.now()
+        let first = firstUnsavedChangeAt ?? now
+        firstUnsavedChangeAt = first
+        if now - first >= Self.autosaveMaxDelay {
+            autosaveNow()
+            return
+        }
         autosaveWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated { self?.autosaveNow() }
         }
         autosaveWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.autosaveDebounce, execute: work)
     }
 
-    /// Writes the session to Application Support (atomic). Never throws to callers.
+    /// Writes the session to Application Support on the serial persistence queue: atomic write that keeps
+    /// the previous autosave, plus an hourly backup snapshot. Never blocks the UI and never throws.
     func autosaveNow() {
-        guard !AppModel.shared.launch.isAutomated else { return }
+        guard !autosaveDisabled else { return }
         autosaveWork?.cancel()
         autosaveWork = nil
+        firstUnsavedChangeAt = nil
+        let job = makeAutosaveJob()
+        persistenceQueue.async { job() }
+    }
+
+    /// Writes the autosave and waits for it (bounded), so the last edits survive quitting.
+    func flushAutosave(timeout: Double) {
+        guard !autosaveDisabled else { return }
+        autosaveWork?.cancel()
+        autosaveWork = nil
+        firstUnsavedChangeAt = nil
+        let job = makeAutosaveJob()
+        let done = DispatchSemaphore(value: 0)
+        persistenceQueue.async {
+            job()
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + max(0.05, timeout))
+    }
+
+    /// Captures the session on the main actor; the returned job runs on the persistence queue.
+    private func makeAutosaveJob() -> @Sendable () -> Void {
         let project = projectForSaving()
         let url = AppResources.autosaveURL
+        let previousURL = Self.previousAutosaveURL
+        let backupsRoot = AppResources.backups
         let lookup = library.lookup
-        let fileURL = self.fileURL
-        DispatchQueue.global(qos: .utility).async {
+        let appVersion = AppResources.appVersion
+        let lastPath = fileURL?.path
+        let lastPathKey = Self.lastProjectPathKey
+        let hasUnsavedChanges = isDirty
+        let dirtyKey = Self.autosaveDirtyKey
+        return {
             do {
-                try ProjectIO.write(project, to: url, library: lookup, appVersion: AppResources.appVersion)
-                UserDefaults.standard.set(fileURL?.path, forKey: "prism.lastProjectPath")
+                let data = try ProjectIO.data(for: project, library: lookup, appVersion: appVersion)
+                try ProjectIO.writeAtomic(data, to: url, keepingPreviousAt: previousURL)
+                _ = try? ProjectIO.recordHourlySnapshot(for: project, data: data, backupsRoot: backupsRoot)
+                UserDefaults.standard.set(lastPath, forKey: lastPathKey)
+                UserDefaults.standard.set(hasUnsavedChanges, forKey: dirtyKey)
             } catch {
-                NSLog("Prism autosave failed: \(error.localizedDescription)")
+                NSLog("Prism autosave failed: %@", error.localizedDescription)
             }
         }
     }
 
-    /// Restores the previous session on launch (autosave → last file → demo).
+    /// Restores the previous session on launch: autosave (or the one before it) → last file → demo.
+    /// If the autosave is newer than the last saved file, it wins so no work is lost. After a crash the
+    /// session is restored even when "restore last session" is off. If reopening the autosave crashed
+    /// Prism last time, it is set aside (moved next to the backups, never deleted) instead of reopened.
     func restoreOnLaunch(options: LaunchOptions) {
         if let path = options.projectPath, (try? open(url: path)) != nil { return }
         if options.demo {
             loadDemo()
             return
         }
+        let fm = FileManager.default
+        let defaults = UserDefaults.standard
         let auto = AppResources.autosaveURL
-        if !options.safeMode, preferences.restoreLastSession, FileManager.default.fileExists(atPath: auto.path),
-           let project = try? ProjectIO.read(from: auto) {
-            let lastPath = UserDefaults.standard.string(forKey: "prism.lastProjectPath")
-            load(project, fileURL: lastPath.map { URL(fileURLWithPath: $0) }, restoreLive: preferences.restoreLastLook)
-            return
+        let previous = Self.previousAutosaveURL
+        let lastURL = defaults.string(forKey: Self.lastProjectPathKey).map { URL(fileURLWithPath: $0) }
+        var notes: [String] = []
+
+        if defaults.bool(forKey: Self.restoringAutosaveKey) {
+            defaults.removeObject(forKey: Self.restoringAutosaveKey)
+            if CrashGuard.previousLaunchCrashed {
+                setAsideAutosaves([auto, previous])
+                notes.append("Prism closed unexpectedly while reopening your last session, so it was set aside in the Backups folder.")
+            }
+        }
+
+        if !options.safeMode, preferences.restoreLastSession || CrashGuard.previousLaunchCrashed {
+            let fileMTime = lastURL.flatMap { modificationDate(of: $0) } ?? .distantPast
+            var latestWasDamaged = false
+            for candidate in [auto, previous] {
+                guard let autoMTime = modificationDate(of: candidate), autoMTime >= fileMTime else { continue }
+                defaults.set(true, forKey: Self.restoringAutosaveKey)
+                guard let report = try? ProjectIO.readWithReport(from: candidate) else {
+                    defaults.removeObject(forKey: Self.restoringAutosaveKey)
+                    if candidate == auto { latestWasDamaged = true }
+                    continue
+                }
+                var fixes = notes
+                if candidate == previous, latestWasDamaged {
+                    fixes.append("The latest autosave was damaged, so the one before it was restored.")
+                }
+                load(report.project, fileURL: lastURL, restoreLive: preferences.restoreLastLook,
+                     additionalFixes: fixes + report.fixes)
+                if defaults.bool(forKey: Self.autosaveDirtyKey) { isDirty = true }
+                let guardKey = Self.restoringAutosaveKey
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.restoreGuardSeconds) {
+                    UserDefaults.standard.removeObject(forKey: guardKey)
+                }
+                return
+            }
+            if let lastURL, fm.fileExists(atPath: lastURL.path), (try? open(url: lastURL)) != nil {
+                openReport = notes + openReport
+                return
+            }
         }
         loadDemo()
+        openReport = notes + openReport
+    }
+
+    private func modificationDate(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+
+    /// Moves autosave files that crashed Prism into `Backups/Crashed Sessions` (renamed in place as a fallback).
+    private func setAsideAutosaves(_ urls: [URL]) {
+        let fm = FileManager.default
+        let dir = AppResources.backups.appendingPathComponent("Crashed Sessions", isDirectory: true)
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let stamp = Int(Date().timeIntervalSince1970)
+        for url in urls where fm.fileExists(atPath: url.path) {
+            let destination = dir.appendingPathComponent("\(stamp)-\(url.lastPathComponent)")
+            if (try? fm.moveItem(at: url, to: destination)) != nil { continue }
+            if (try? fm.moveItem(at: url, to: url.appendingPathExtension("crashed-\(stamp)"))) != nil { continue }
+            try? fm.removeItem(at: url)
+        }
     }
 }
 
