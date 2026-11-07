@@ -59,11 +59,13 @@ curl -fsSL https://raw.githubusercontent.com/goveaaron/StudioLightingMac/main/sc
   4. only then make it the release the installer downloads.
 
 > [!NOTE]
-> Is the cloud team still running? Ask the user. While it is, its agents keep pushing to
-> `agent/*` and landing on `main`. Pull often, and don't rewrite files in an area whose agent
-> is active. Instead, report what you find as a **GitHub issue labelled `field-test`** (see §5)
-> and the cloud orchestrator will route it. If the team has been stopped, you own everything.
-> Work the "Still to do" column in the order given in §4.
+> **The cloud team is pausing.** On 2026-11-07 its agents were asked to stop by about 15:30 PT.
+> Each one either lands green work on `main` or leaves its branch pushed with a `WIP:` commit
+> saying what's unfinished. This file's table is then updated with every branch's final state.
+> - **Until 15:30 PT:** don't merge `agent/*` branches yourself; do the setup and §3 first.
+> - **After that:** you own everything. `git pull` and re-read §1.
+> - **If the user resumes the cloud team later:** report findings as GitHub issues labelled
+>   `field-test` (§5) instead of editing areas its agents are working in.
 
 ---
 
