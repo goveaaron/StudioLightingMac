@@ -40,6 +40,8 @@ struct BottomBar: View {
 
             Spacer()
 
+            FadeProgressRing()
+
             if let look = app.show.activeLook {
                 HStack(spacing: 6) {
                     Text("Look").font(Theme.Font.caption).foregroundStyle(Theme.textTertiary)

@@ -137,19 +137,31 @@ public struct Look: Codable, Hashable, Sendable, Identifiable {
              fixtureDelays, isFavorite, shortcut, sortIndex, notes, createdAt, modifiedAt
     }
 
+    /// Maximum effects per look accepted from files.
+    public static let maxEffects = 64
+
+    /// Decodes defensively: a corrupt field falls back to its default instead of dropping the look.
+    /// Only an entry with neither a usable name nor states is rejected (it isn't a look at all).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Look"
-        folderID = try c.decodeIfPresent(UUID.self, forKey: .folderID)
-        states = try c.decodeIfPresent(FixtureStateMap.self, forKey: .states) ?? FixtureStateMap()
-        effects = try c.decodeIfPresent([EffectInstance].self, forKey: .effects) ?? []
-        music = try c.decodeIfPresent(MusicModeSettings.self, forKey: .music)
-        fadeTime = clamp((try c.decodeIfPresent(Double.self, forKey: .fadeTime) ?? 1).finiteOr(1), 0, 600)
-        fadeCurve = try c.decodeIfPresent(FadeCurve.self, forKey: .fadeCurve) ?? .easeInOut
-        spatialDelay = clamp((try c.decodeIfPresent(Double.self, forKey: .spatialDelay) ?? 0).finiteOr(0), 0, 60)
-        delayDirection = try c.decodeIfPresent(EffectDirection.self, forKey: .delayDirection) ?? .leftToRight
-        if let rawDelays = try c.decodeIfPresent([String: Double].self, forKey: .fixtureDelays) {
+        let decodedName = c.decodeLenient(String.self, forKey: .name)
+        let decodedStates = c.decodeLenient(FixtureStateMap.self, forKey: .states)
+        guard decodedName != nil || decodedStates != nil else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Look has neither a name nor states."))
+        }
+        id = c.decodeLenient(UUID.self, forKey: .id) ?? UUID()
+        let rawName = (decodedName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        name = rawName.isEmpty ? "Look" : String(rawName.prefix(200))
+        folderID = c.decodeLenient(UUID.self, forKey: .folderID)
+        states = decodedStates ?? FixtureStateMap()
+        effects = c.decodeTolerantArray(EffectInstance.self, forKey: .effects, limit: Look.maxEffects)?.values ?? []
+        music = c.decodeLenient(MusicModeSettings.self, forKey: .music)
+        fadeTime = clamp((c.decodeLenient(Double.self, forKey: .fadeTime) ?? 1).finiteOr(1), 0, 600)
+        fadeCurve = c.decodeLenient(FadeCurve.self, forKey: .fadeCurve) ?? .easeInOut
+        spatialDelay = clamp((c.decodeLenient(Double.self, forKey: .spatialDelay) ?? 0).finiteOr(0), 0, 60)
+        delayDirection = c.decodeLenient(EffectDirection.self, forKey: .delayDirection) ?? .leftToRight
+        if let rawDelays = c.decodeLenient([String: Double].self, forKey: .fixtureDelays) {
             var d: [UUID: Double] = [:]
             for (k, v) in rawDelays {
                 if let uid = UUID(uuidString: k) { d[uid] = clamp(v.finiteOr(0), 0, 60) }
@@ -158,12 +170,12 @@ public struct Look: Codable, Hashable, Sendable, Identifiable {
         } else {
             fixtureDelays = [:]
         }
-        isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
-        shortcut = try c.decodeIfPresent(String.self, forKey: .shortcut)
-        sortIndex = try c.decodeIfPresent(Int.self, forKey: .sortIndex) ?? 0
-        notes = try c.decodeIfPresent(String.self, forKey: .notes) ?? ""
-        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
-        modifiedAt = try c.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
+        isFavorite = c.decodeLenient(Bool.self, forKey: .isFavorite) ?? false
+        shortcut = c.decodeLenient(String.self, forKey: .shortcut).map { String($0.prefix(8)) }
+        sortIndex = c.decodeLenient(Int.self, forKey: .sortIndex) ?? 0
+        notes = c.decodeLenient(String.self, forKey: .notes) ?? ""
+        createdAt = c.decodeLenient(Date.self, forKey: .createdAt) ?? Date()
+        modifiedAt = c.decodeLenient(Date.self, forKey: .modifiedAt) ?? Date()
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -218,6 +230,25 @@ public struct LookFolder: Codable, Hashable, Sendable, Identifiable {
 
     public init(id: UUID = UUID(), name: String, parentID: UUID? = nil, sortIndex: Int = 0, isExpanded: Bool = true) {
         self.id = id; self.name = name; self.parentID = parentID; self.sortIndex = sortIndex; self.isExpanded = isExpanded
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, parentID, sortIndex, isExpanded }
+
+    /// Decodes defensively; only an entry with neither an id nor a name is rejected.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedID = c.decodeLenient(UUID.self, forKey: .id)
+        let decodedName = c.decodeLenient(String.self, forKey: .name)
+        guard decodedID != nil || decodedName != nil else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath,
+                                                    debugDescription: "Folder has neither an id nor a name."))
+        }
+        id = decodedID ?? UUID()
+        let trimmed = (decodedName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        name = trimmed.isEmpty ? "Folder" : String(trimmed.prefix(200))
+        parentID = c.decodeLenient(UUID.self, forKey: .parentID)
+        sortIndex = c.decodeLenient(Int.self, forKey: .sortIndex) ?? 0
+        isExpanded = c.decodeLenient(Bool.self, forKey: .isExpanded) ?? true
     }
 }
 
@@ -290,15 +321,22 @@ public struct StageSettings: Codable, Hashable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        width = clamp((try c.decodeIfPresent(Double.self, forKey: .width) ?? 10).finiteOr(10), 1, 200)
-        height = clamp((try c.decodeIfPresent(Double.self, forKey: .height) ?? 6).finiteOr(6), 1, 200)
-        props = try c.decodeIfPresent([StageProp].self, forKey: .props) ?? []
-        background = try c.decodeIfPresent(StageBackground.self, forKey: .background) ?? .grid
-        photoData = try c.decodeIfPresent(Data.self, forKey: .photoData)
-        showLabels = try c.decodeIfPresent(Bool.self, forKey: .showLabels) ?? true
-        showGlow = try c.decodeIfPresent(Bool.self, forKey: .showGlow) ?? true
-        snapToGrid = try c.decodeIfPresent(Bool.self, forKey: .snapToGrid) ?? false
-        gridSize = clamp((try c.decodeIfPresent(Double.self, forKey: .gridSize) ?? 0.25).finiteOr(0.25), 0.05, 5)
+        width = clamp((c.decodeLenient(Double.self, forKey: .width) ?? 10).finiteOr(10), 1, 200)
+        height = clamp((c.decodeLenient(Double.self, forKey: .height) ?? 6).finiteOr(6), 1, 200)
+        props = (c.decodeTolerantArray(StageProp.self, forKey: .props, limit: 500)?.values ?? []).map { prop in
+            var p = prop
+            p.transform = p.transform.sanitized
+            p.width = p.width.map { clamp($0.finiteOr(1), 0.01, 200) }
+            p.height = p.height.map { clamp($0.finiteOr(1), 0.01, 200) }
+            return p
+        }
+        background = c.decodeLenient(StageBackground.self, forKey: .background) ?? .grid
+        // Photo backgrounds are meant to be small; ignore absurdly large blobs (> 20 MB).
+        photoData = c.decodeLenient(Data.self, forKey: .photoData).flatMap { $0.count <= 20_000_000 ? $0 : nil }
+        showLabels = c.decodeLenient(Bool.self, forKey: .showLabels) ?? true
+        showGlow = c.decodeLenient(Bool.self, forKey: .showGlow) ?? true
+        snapToGrid = c.decodeLenient(Bool.self, forKey: .snapToGrid) ?? false
+        gridSize = clamp((c.decodeLenient(Double.self, forKey: .gridSize) ?? 0.25).finiteOr(0.25), 0.05, 5)
     }
 
     /// The reference point for "left/right/above" — the first person prop, else stage center.

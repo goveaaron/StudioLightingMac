@@ -24,7 +24,7 @@ enum SelfTest {
         coreChecks + OutputSelfTest.checks + MusicSelfTest.checks + RemoteSelfTest.checks
             + AssistantSelfTest.checks + CameraSelfTest.checks + PatchSelfTest.checks
             + StageSelfTest.checks + InspectorSelfTest.checks + LooksSelfTest.checks
-            + OnboardingSelfTest.checks + EffectsSelfTest.checks
+            + OnboardingSelfTest.checks + EffectsSelfTest.checks + EngineSelfTest.checks
     }
 
     static var coreChecks: [Check] {
