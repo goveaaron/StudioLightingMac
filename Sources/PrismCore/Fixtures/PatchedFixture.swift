@@ -127,13 +127,20 @@ public enum DimmerCurve: String, Codable, CaseIterable, Hashable, Sendable {
 
 /// Per-fixture safety/creative limits.
 public struct FixtureLimits: Codable, Hashable, Sendable {
-    /// Output intensity is scaled into [minIntensity, maxIntensity] (0…1).
+    /// Output intensity is scaled/clamped into [minIntensity, maxIntensity] (0…1).
     public var maxIntensity: Double
     public var minIntensity: Double
     /// If false, effects/music mode never touch this fixture (e.g. the key light while filming).
     public var allowEffects: Bool
     /// If false, strobing is suppressed entirely.
     public var allowStrobe: Bool
+    /// When true, this fixture is protected from effects, music mode, and remote changes
+    /// unless explicitly targeted from the UI.
+    public var protected: Bool
+    /// Optional Kelvin lower bound for this fixture.
+    public var minKelvin: Double?
+    /// Optional Kelvin upper bound for this fixture.
+    public var maxKelvin: Double?
     /// Dimmer transfer curve applied to master intensity.
     public var dimmerCurve: DimmerCurve
     /// When true (recommended for key lights), the fixture never dims all the way to 0 DMX while
@@ -145,29 +152,74 @@ public struct FixtureLimits: Codable, Hashable, Sendable {
         minIntensity: Double = 0,
         allowEffects: Bool = true,
         allowStrobe: Bool = true,
+        protected: Bool = false,
+        minKelvin: Double? = nil,
+        maxKelvin: Double? = nil,
         dimmerCurve: DimmerCurve = .linear,
         neverFullyOffUnlessZero: Bool = false
     ) {
-        self.maxIntensity = maxIntensity
-        self.minIntensity = minIntensity
+        let lo = clamp01(minIntensity.finiteOr(0))
+        let hi = max(lo, clamp01(maxIntensity.finiteOr(1)))
+        self.minIntensity = lo
+        self.maxIntensity = hi
         self.allowEffects = allowEffects
         self.allowStrobe = allowStrobe
+        self.protected = protected
+        let kLo = minKelvin.map { clamp($0.finiteOr(1700), 1000, 20000) }
+        let kHi = maxKelvin.map { clamp($0.finiteOr(12000), 1000, 20000) }
+        if let loK = kLo, let hiK = kHi, hiK < loK {
+            self.minKelvin = loK
+            self.maxKelvin = loK
+        } else {
+            self.minKelvin = kLo
+            self.maxKelvin = kHi
+        }
         self.dimmerCurve = dimmerCurve
         self.neverFullyOffUnlessZero = neverFullyOffUnlessZero
     }
 
+    public static let `default` = FixtureLimits()
+
+    public var sanitized: FixtureLimits {
+        FixtureLimits(
+            maxIntensity: maxIntensity,
+            minIntensity: minIntensity,
+            allowEffects: allowEffects,
+            allowStrobe: allowStrobe,
+            protected: protected,
+            minKelvin: minKelvin,
+            maxKelvin: maxKelvin,
+            dimmerCurve: dimmerCurve,
+            neverFullyOffUnlessZero: neverFullyOffUnlessZero
+        )
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case maxIntensity, minIntensity, allowEffects, allowStrobe, dimmerCurve, neverFullyOffUnlessZero
+        case maxIntensity, minIntensity, allowEffects, allowStrobe, protected, minKelvin, maxKelvin, dimmerCurve, neverFullyOffUnlessZero
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        maxIntensity = clamp01((try c.decodeIfPresent(Double.self, forKey: .maxIntensity) ?? 1).finiteOr(1))
-        minIntensity = clamp01((try c.decodeIfPresent(Double.self, forKey: .minIntensity) ?? 0).finiteOr(0))
-        allowEffects = try c.decodeIfPresent(Bool.self, forKey: .allowEffects) ?? true
-        allowStrobe = try c.decodeIfPresent(Bool.self, forKey: .allowStrobe) ?? true
-        dimmerCurve = try c.decodeIfPresent(DimmerCurve.self, forKey: .dimmerCurve) ?? .linear
-        neverFullyOffUnlessZero = try c.decodeIfPresent(Bool.self, forKey: .neverFullyOffUnlessZero) ?? false
+        let minI = (try c.decodeIfPresent(Double.self, forKey: .minIntensity) ?? 0).finiteOr(0)
+        let maxI = (try c.decodeIfPresent(Double.self, forKey: .maxIntensity) ?? 1).finiteOr(1)
+        let allowFX = try c.decodeIfPresent(Bool.self, forKey: .allowEffects) ?? true
+        let allowStr = try c.decodeIfPresent(Bool.self, forKey: .allowStrobe) ?? true
+        let prot = try c.decodeIfPresent(Bool.self, forKey: .protected) ?? false
+        let minK = try c.decodeIfPresent(Double.self, forKey: .minKelvin)
+        let maxK = try c.decodeIfPresent(Double.self, forKey: .maxKelvin)
+        let curve = try c.decodeIfPresent(DimmerCurve.self, forKey: .dimmerCurve) ?? .linear
+        let neverOff = try c.decodeIfPresent(Bool.self, forKey: .neverFullyOffUnlessZero) ?? false
+        self.init(
+            maxIntensity: maxI,
+            minIntensity: minI,
+            allowEffects: allowFX,
+            allowStrobe: allowStr,
+            protected: prot,
+            minKelvin: minK,
+            maxKelvin: maxK,
+            dimmerCurve: curve,
+            neverFullyOffUnlessZero: neverOff
+        )
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -176,6 +228,11 @@ public struct FixtureLimits: Codable, Hashable, Sendable {
         try c.encode(minIntensity, forKey: .minIntensity)
         try c.encode(allowEffects, forKey: .allowEffects)
         try c.encode(allowStrobe, forKey: .allowStrobe)
+        if protected {
+            try c.encode(protected, forKey: .protected)
+        }
+        try c.encodeIfPresent(minKelvin, forKey: .minKelvin)
+        try c.encodeIfPresent(maxKelvin, forKey: .maxKelvin)
         if dimmerCurve != .linear {
             try c.encode(dimmerCurve, forKey: .dimmerCurve)
         }
@@ -183,8 +240,6 @@ public struct FixtureLimits: Codable, Hashable, Sendable {
             try c.encode(neverFullyOffUnlessZero, forKey: .neverFullyOffUnlessZero)
         }
     }
-
-    public static let `default` = FixtureLimits()
 }
 
 /// Per-fixture color calibration so different lights match each other and the screen.
@@ -320,6 +375,12 @@ public struct PatchedFixture: Codable, Hashable, Sendable, Identifiable {
     public var stageLabel: String { shortName.isEmpty ? name : shortName }
 
     public var isPatched: Bool { address != nil }
+
+    /// True when this fixture is protected from effects, music mode, and remote changes
+    /// (key/fill role, `limits.protected`, or `limits.allowEffects == false`).
+    public var isProtected: Bool {
+        role == .key || role == .fill || limits.protected || !limits.allowEffects
+    }
 }
 
 /// A saved set of fixtures ("All Tubes", "Background", "Key & Fill").
