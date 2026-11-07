@@ -326,53 +326,62 @@ public enum PatchMath {
         style: AddressingStyle = .packed
     ) -> ConflictResolutionResult {
         var updated = fixtures
-        var accepted: [ResolvedFixture] = []
         var changes: [String] = []
 
+        // Pass 1: every light that doesn't clash with an earlier one stays exactly where it is.
+        var kept: [ResolvedFixture] = []
+        var toMove: [(index: Int, definition: FixtureDefinition, mode: FixtureMode)] = []
         for idx in updated.indices {
             let f = updated[idx]
             guard let def = library(f.definitionID),
                   let mode = def.mode(named: f.modeName) ?? def.recommendedMode else { continue }
             guard let currentAddr = f.address else {
-                accepted.append(ResolvedFixture(fixture: f, definition: def, mode: mode))
+                kept.append(ResolvedFixture(fixture: f, definition: def, mode: mode))
                 continue
             }
-
-            let chCount = max(1, mode.channelCount)
-            let currentEnd = currentAddr + chCount - 1
+            let currentEnd = currentAddr + max(1, mode.channelCount) - 1
             let isOverflow = currentEnd > 512
             let isLinked = f.tags.contains("linked")
-
-            let hasOverlap = !isLinked && accepted.contains { other in
+            let hasOverlap = !isLinked && kept.contains { other in
                 guard other.fixture.universe == f.universe, let otherRange = other.addressRange else { return false }
                 return max(currentAddr, otherRange.lowerBound) <= min(currentEnd, otherRange.upperBound)
             }
-
             if !isOverflow && !hasOverlap {
-                accepted.append(ResolvedFixture(fixture: f, definition: def, mode: mode))
-                continue
+                kept.append(ResolvedFixture(fixture: f, definition: def, mode: mode))
+            } else {
+                toMove.append((idx, def, mode))
             }
+        }
 
-            let alloc = allocateAddresses(
-                channelCount: chCount,
-                count: 1,
-                style: style,
-                startingUniverse: f.universe,
-                startingAt: currentAddr,
-                existing: accepted
-            )
-            if let assigned = alloc.assignments.first {
-                let oldU = f.universe
-                let oldA = currentAddr
-                updated[idx].universe = assigned.universe
-                updated[idx].address = assigned.address
-                let moved = updated[idx]
-                accepted.append(ResolvedFixture(fixture: moved, definition: def, mode: mode))
-                if assigned.universe != oldU {
-                    changes.append("Moved \(f.name) from U\(oldU)·\(String(format: "%03d", oldA)) to U\(assigned.universe)·\(assigned.displayAddress).")
-                } else {
-                    changes.append("Moved \(f.name) from \(String(format: "%03d", oldA)) to \(assigned.displayAddress).")
-                }
+        // Pass 2: only the clashing lights move, into space free of *all* kept lights (so nothing
+        // else has to be re-addressed on the physical lights).
+        var accepted = kept
+        for item in toMove {
+            let f = updated[item.index]
+            let currentAddr = f.address ?? 1
+            let footprint = max(1, item.mode.channelCount)
+            // Prefer the nearest gap after where the light is now, then any gap in the same
+            // universe, and only then the next universe (most studios have just one).
+            var placement = allocateAddresses(
+                channelCount: footprint, count: 1, style: style,
+                startingUniverse: f.universe, startingAt: currentAddr, existing: accepted
+            ).assignments.first
+            if let first = placement, first.universe != f.universe, currentAddr > 1 {
+                let fromStart = allocateAddresses(
+                    channelCount: footprint, count: 1, style: style,
+                    startingUniverse: f.universe, startingAt: 1, existing: accepted
+                ).assignments.first
+                if let fromStart, fromStart.universe == f.universe { placement = fromStart }
+            }
+            guard let assigned = placement else { continue }
+            let oldU = f.universe
+            updated[item.index].universe = assigned.universe
+            updated[item.index].address = assigned.address
+            accepted.append(ResolvedFixture(fixture: updated[item.index], definition: item.definition, mode: item.mode))
+            if assigned.universe != oldU {
+                changes.append("Moved \(f.name) from universe \(oldU) address \(String(format: "%03d", currentAddr)) to universe \(assigned.universe) address \(assigned.displayAddress).")
+            } else {
+                changes.append("Moved \(f.name) from \(String(format: "%03d", currentAddr)) to \(assigned.displayAddress).")
             }
         }
 

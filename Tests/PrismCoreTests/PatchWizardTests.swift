@@ -202,4 +202,39 @@ final class PatchWizardTests: XCTestCase {
         let w = SetupWalkthrough.make(for: resolved(tube(), mode: "CCT & RGB", address: nil), address: 9999)
         XCTAssertEqual(w.address, 512)
     }
+
+    // MARK: Fix it for me (conflict resolution)
+
+    private func block56() -> FixtureDefinition {
+        FixtureDefinition(id: "test.block56", manufacturer: "Generic", model: "Block", category: .other,
+                          modes: [FixtureMode(name: "Block", channels: Array(repeating: ChannelDefinition(kind: .intensity), count: 56))])
+    }
+
+    func testFixConflictsMovesOnlyTheClashingLightAndNeverOntoALaterLight() {
+        let def = block56()
+        let a = PatchedFixture(name: "A", definitionID: def.id, modeName: "Block", universe: 1, address: 1)
+        let b = PatchedFixture(name: "B", definitionID: def.id, modeName: "Block", universe: 1, address: 40)   // clashes with A
+        let c = PatchedFixture(name: "C", definitionID: def.id, modeName: "Block", universe: 1, address: 100)  // fine
+        let result = PatchMath.resolveConflicts(in: [a, b, c], library: { $0 == def.id ? def : nil }, style: .packed)
+        let byName = Dictionary(uniqueKeysWithValues: result.fixtures.map { ($0.name, $0) })
+        XCTAssertEqual(byName["A"]?.address, 1)
+        XCTAssertEqual(byName["C"]?.address, 100, "a light that was fine must not be re-addressed")
+        XCTAssertEqual(byName["B"]?.address, 156, "B goes after C, not into 57…112 where it would hit C")
+        XCTAssertEqual(result.changes, ["Moved B from 040 to 156."])
+        let resolved = result.fixtures.map { ResolvedFixture(fixture: $0, definition: def, mode: def.modes[0]) }
+        XCTAssertTrue(PatchMath.conflicts(resolved).isEmpty)
+    }
+
+    func testFixConflictsStaysInTheSameUniverseWhenThereIsAnyGap() {
+        let def = block56()
+        let a = PatchedFixture(name: "A", definitionID: def.id, modeName: "Block", universe: 1, address: 1)
+        let b = PatchedFixture(name: "B", definitionID: def.id, modeName: "Block", universe: 1, address: 470)  // runs past 512
+        let result = PatchMath.resolveConflicts(in: [a, b], library: { $0 == def.id ? def : nil }, style: .packed)
+        let moved = result.fixtures.first { $0.name == "B" }
+        XCTAssertEqual(moved?.universe, 1)
+        XCTAssertEqual(moved?.address, 57)
+        let resolved = result.fixtures.map { ResolvedFixture(fixture: $0, definition: def, mode: def.modes[0]) }
+        XCTAssertTrue(PatchMath.overflowing(resolved).isEmpty)
+        XCTAssertTrue(PatchMath.conflicts(resolved).isEmpty)
+    }
 }
