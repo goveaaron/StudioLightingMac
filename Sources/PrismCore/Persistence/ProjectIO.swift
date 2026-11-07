@@ -231,6 +231,23 @@ public enum ProjectIO {
             _ = fsync(dirFD)
             _ = close(dirFD)
         }
+        removeStaleTemporaryFiles(for: url)
+    }
+
+    /// Deletes temp files that a crash between write and rename left next to `url`. Only our own
+    /// `.<name>.tmp-*` files older than `age` are touched, so a concurrent in-flight write is never hit.
+    static func removeStaleTemporaryFiles(for url: URL, olderThan age: TimeInterval = 600) {
+        let fm = FileManager.default
+        let dir = url.deletingLastPathComponent()
+        let prefix = ".\(url.lastPathComponent).tmp-"
+        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        let cutoff = Date().addingTimeInterval(-age)
+        for name in names where name.hasPrefix(prefix) {
+            let path = dir.appendingPathComponent(name).path
+            guard let modified = (try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date,
+                  modified < cutoff else { continue }
+            try? fm.removeItem(atPath: path)
+        }
     }
 
     /// Writes atomically (temp file in same directory + rename) so a crash mid-save never corrupts the project.

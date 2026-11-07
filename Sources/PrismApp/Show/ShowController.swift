@@ -170,6 +170,15 @@ final class ShowController {
         return result
     }
 
+    /// Applies a multi-step plan (assistant, Shortcuts…) step by step as a single undo step.
+    @discardableResult
+    func applyPlan(_ steps: [[LightingCommand]], origin: CommandOrigin, undoName: String) -> [CommandResult] {
+        let key = "plan-\(UUID().uuidString)"
+        beginInteractiveChange(coalesceKey: key)
+        defer { endInteractiveChange() }
+        return steps.map { apply($0, origin: origin, undoName: undoName, coalesceKey: key) }
+    }
+
     // MARK: Direct edits
 
     /// Edits base states of fixtures (inspector, stage painting). Turning a light's color on

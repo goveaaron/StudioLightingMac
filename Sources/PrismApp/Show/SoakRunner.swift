@@ -26,6 +26,8 @@ enum SoakRunner {
         var measuringSince: Double?
         var framesAtStart: UInt64 = 0
         var commands = 0
+        var iteration = 0
+        var looksRecalled = 0
         var rssSamples: [Int64] = []
         var lastSample = start
 
@@ -45,6 +47,12 @@ enum SoakRunner {
             let batch = fuzzer.nextBatch(in: app.show.document, maxCount: 3)
             app.show.apply(batch, origin: fuzzer.nextOrigin())
             commands += batch.count
+            iteration += 1
+            if iteration % 26 == 0, let look = fuzzer.rng.pick(app.show.looks) {
+                // Every ~2 s: a look recall with a random crossfade, interrupting fades in flight.
+                app.show.recallLook(look.id, fade: fuzzer.rng.nextUnit() * 3, origin: fuzzer.nextOrigin())
+                looksRecalled += 1
+            }
 
             if app.show.looks.count > baseLooks + maxExtraLooks {
                 app.show.editProject("Soak Cleanup", change: [.looks]) { project in
@@ -78,7 +86,7 @@ enum SoakRunner {
         }
 
         var line = "SOAK \(failures.isEmpty ? "PASSED" : "FAILED"): \(Int(duration)) s, \(commands) commands, "
-            + "\(frames) frames (\(format(Double(frames) / measured)) fps), "
+            + "\(looksRecalled) look recalls, \(frames) frames (\(format(Double(frames) / measured)) fps), "
             + "peak frame \(format(stats.peakFrameDurationMs)) ms, \(stats.framesOverBudget) over budget, "
             + "max tick gap \(format(stats.maxTickIntervalMs)) ms, memory \(growth >= 0 ? "+" : "")\(format(megabytes(growth))) MB"
         if !failures.isEmpty { line += " — " + failures.joined(separator: "; ") }

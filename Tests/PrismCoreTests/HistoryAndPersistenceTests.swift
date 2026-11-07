@@ -233,10 +233,26 @@ final class HistoryAndPersistenceTests: XCTestCase {
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.contains(".tmp-") }
         XCTAssertEqual(leftovers, [])
 
+        // A crash between writing the temp file and renaming it leaves a torn temp file behind: the real
+        // file is untouched, and the next save sweeps stale temp files but never a fresh (in-flight) one.
+        let stale = dir.appendingPathComponent(".Show.prismlights.tmp-crashed")
+        let fresh = dir.appendingPathComponent(".Show.prismlights.tmp-inflight")
+        try Data("{\"name\": \"Torn".utf8).write(to: stale)
+        try Data("{".utf8).write(to: fresh)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: stale.path)
+        XCTAssertEqual(try ProjectIO.read(from: url).name, "Third")
+        p.name = "Fourth"
+        try ProjectIO.write(p, to: url, library: lib.definition, keepingPreviousAt: prev)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stale.path), "stale temp file from a crash is removed")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fresh.path), "a recent temp file may belong to an in-flight save")
+        XCTAssertEqual(try ProjectIO.read(from: url).name, "Fourth")
+        XCTAssertEqual(try ProjectIO.read(from: prev).name, "Third")
+        try FileManager.default.removeItem(at: fresh)
+
         // Missing parent folders are created.
         let nested = dir.appendingPathComponent("a/b/c/Show.prismlights")
         try ProjectIO.write(p, to: nested, library: lib.definition)
-        XCTAssertEqual(try ProjectIO.read(from: nested).name, "Third")
+        XCTAssertEqual(try ProjectIO.read(from: nested).name, "Fourth")
 
         // Impossible destinations fail with a readable error instead of crashing.
         let blocker = dir.appendingPathComponent("not-a-folder")

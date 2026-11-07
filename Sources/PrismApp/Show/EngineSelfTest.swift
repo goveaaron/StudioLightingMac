@@ -57,9 +57,14 @@ enum EngineSelfTest {
             let time = 1000 + Double(step) * 0.1
             let batch = fuzzer.nextBatch(in: doc, maxCount: 3)
             for command in batch {
+                // Decoding may normalize once (RGB colors are stored as 8-bit hex); the kind must
+                // survive and a second round trip must be stable.
                 guard let data = try? encoder.encode(command),
                       let decoded = try? decoder.decode(LightingCommand.self, from: data),
-                      decoded == command else {
+                      kind(of: decoded) == kind(of: command),
+                      let again = try? encoder.encode(decoded),
+                      let redecoded = try? decoder.decode(LightingCommand.self, from: again),
+                      redecoded == decoded else {
                     return "JSON round trip failed for \(command)"
                 }
             }
@@ -74,6 +79,11 @@ enum EngineSelfTest {
             }
         }
         return EngineInvariants.violation(in: doc)
+    }
+
+    /// The command's case name, e.g. "shiftColor".
+    private static func kind(of command: LightingCommand) -> String {
+        String(String(describing: command).prefix { $0 != "(" })
     }
 
     /// A protected light ignores broad selectors from every non-UI origin; explicit UI edits are clamped
