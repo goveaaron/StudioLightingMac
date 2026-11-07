@@ -9,9 +9,14 @@ on:
         description: Publish a GitHub release from this commit
         type: boolean
         default: false
+      prerelease:
+        description: Mark it as a pre-release (the installer keeps using the latest full release)
+        type: boolean
+        default: false
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Per event type, so a push landing on main can't cancel a pending manual (release) run.
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   # Agent branches: newer pushes supersede older runs. main: every landing gets a full run.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
@@ -196,14 +201,83 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ inputs.prerelease && 'true' || 'false' }}
         run: |
-          gh release create "v$PRISM_VERSION" dist/Prism.zip dist/Prism.zip.sha256 \
-            --target "$GITHUB_SHA" --latest \
-            --title "Prism $PRISM_VERSION" \
-            --notes "Install or update on your Mac by pasting this into Terminal:
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          Install or update on your Mac by pasting this into Terminal:
 
           \`\`\`
           curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/scripts/install.sh | bash
           \`\`\`
 
-          Universal app (Apple silicon + Intel), macOS 14 Sonoma or newer."
+          Universal app (Apple silicon + Intel), macOS 14 Sonoma or newer.
+          EOF
+          if [ "$PRERELEASE" = "true" ]; then
+            flags=(--prerelease --title "Prism $PRISM_VERSION (preview)")
+          else
+            flags=(--latest --title "Prism $PRISM_VERSION")
+          fi
+          gh release create "v$PRISM_VERSION" dist/Prism.zip dist/Prism.zip.sha256 \
+            --target "$GITHUB_SHA" "${flags[@]}" --notes-file "$RUNNER_TEMP/notes.md"
+
+  # Install the just-published release exactly the way a user would (the curl one-liner), on
+  # Apple silicon and on Intel, then make sure the installed app is intact and actually runs.
+  install-test:
+    name: Install · ${{ matrix.os }}
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      # (the `env` context isn't available here; this is the same value as PRISM_VERSION)
+      PRISM_DOWNLOAD_URL: https://github.com/${{ github.repository }}/releases/download/v0.9.${{ github.run_number }}/Prism.zip
+      PRISM_NO_OPEN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the installer one-liner
+        run: |
+          sw_vers; uname -m
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/scripts/install.sh" | bash
+          test -x /Applications/Prism.app/Contents/MacOS/Prism
+      - name: Inspect the installed app
+        run: |
+          APP=/Applications/Prism.app
+          lipo -archs "$APP/Contents/MacOS/Prism" | tee "$RUNNER_TEMP/archs.txt"
+          grep -q arm64 "$RUNNER_TEMP/archs.txt" && grep -q x86_64 "$RUNNER_TEMP/archs.txt"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dr - "$APP"
+          defaults read "$APP/Contents/Info" CFBundleShortVersionString
+          du -sh "$APP"
+      - name: Self-test (installed app)
+        run: scripts/mac-timeout.sh 300 /Applications/Prism.app/Contents/MacOS/Prism --self-test
+      - name: Launch like a user and quit
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots"
+          open /Applications/Prism.app
+          for _ in $(seq 1 40); do pgrep -x Prism >/dev/null && break; sleep 0.5; done
+          sleep 12
+          pgrep -x Prism >/dev/null || { echo "Prism is not running 12 s after launch"; exit 1; }
+          screencapture -x "$RUNNER_TEMP/shots/installed-launch.png" || true
+          pkill -TERM -x Prism || true
+          for _ in $(seq 1 20); do pgrep -x Prism >/dev/null || break; sleep 0.5; done
+          if pgrep -x Prism >/dev/null; then echo "Prism did not quit on SIGTERM"; pkill -KILL -x Prism; exit 1; fi
+      - name: Re-run the installer over the existing copy (update path)
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/scripts/install.sh" | bash
+          codesign --verify --deep --strict /Applications/Prism.app
+      - name: Crash reports
+        if: failure()
+        run: |
+          find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name 'Prism*' -mmin -60 2>/dev/null | while read -r f; do
+            echo "===== $f"; head -c 12000 "$f"; echo
+          done
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: install-${{ matrix.os }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 5
+          if-no-files-found: ignore
