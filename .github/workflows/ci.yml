@@ -65,6 +65,11 @@ jobs:
         run: swift build --build-tests
       - name: Unit tests
         run: swift test --skip-build
+      - name: Signing identity
+        env:
+          PRISM_SIGNING_P12: ${{ secrets.PRISM_SIGNING_P12 }}
+          PRISM_SIGNING_PASSWORD: ${{ secrets.PRISM_SIGNING_PASSWORD }}
+        run: scripts/ci-import-signing.sh
       - name: Bundle app
         run: scripts/build_app.sh --version "$PRISM_VERSION" --build "$PRISM_BUILD"
       - name: Self-test
@@ -174,6 +179,11 @@ jobs:
           path: .build
           key: macos-spm-${{ hashFiles('Package.resolved') }}-${{ github.sha }}
           restore-keys: macos-spm-${{ hashFiles('Package.resolved') }}-
+      - name: Signing identity
+        env:
+          PRISM_SIGNING_P12: ${{ secrets.PRISM_SIGNING_P12 }}
+          PRISM_SIGNING_PASSWORD: ${{ secrets.PRISM_SIGNING_PASSWORD }}
+        run: scripts/ci-import-signing.sh
       - name: Build universal release
         run: scripts/build_app.sh --release --universal --version "$PRISM_VERSION" --build "$PRISM_BUILD"
       - name: Self-test (release build)
