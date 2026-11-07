@@ -277,16 +277,19 @@ public struct StageSettings: Codable, Hashable, Sendable {
     public var showGlow: Bool
     public var snapToGrid: Bool
     public var gridSize: Double
+    /// Opacity (0.1…1) of a camera or photo backdrop behind the lights.
+    public var backgroundOpacity: Double
 
     public init(width: Double = 10, height: Double = 6, props: [StageProp] = [StageProp(kind: .person, label: "Subject", transform: StageTransform(x: 5, y: 3.6))],
                 background: StageBackground = .grid, photoData: Data? = nil, showLabels: Bool = true, showGlow: Bool = true,
-                snapToGrid: Bool = false, gridSize: Double = 0.25) {
+                snapToGrid: Bool = false, gridSize: Double = 0.25, backgroundOpacity: Double = 0.6) {
         self.width = width; self.height = height; self.props = props; self.background = background
         self.photoData = photoData; self.showLabels = showLabels; self.showGlow = showGlow
         self.snapToGrid = snapToGrid; self.gridSize = gridSize
+        self.backgroundOpacity = clamp(backgroundOpacity.finiteOr(0.6), 0.1, 1)
     }
 
-    private enum CodingKeys: String, CodingKey { case width, height, props, background, photoData, showLabels, showGlow, snapToGrid, gridSize }
+    private enum CodingKeys: String, CodingKey { case width, height, props, background, photoData, showLabels, showGlow, snapToGrid, gridSize, backgroundOpacity }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -299,6 +302,7 @@ public struct StageSettings: Codable, Hashable, Sendable {
         showGlow = try c.decodeIfPresent(Bool.self, forKey: .showGlow) ?? true
         snapToGrid = try c.decodeIfPresent(Bool.self, forKey: .snapToGrid) ?? false
         gridSize = clamp((try c.decodeIfPresent(Double.self, forKey: .gridSize) ?? 0.25).finiteOr(0.25), 0.05, 5)
+        backgroundOpacity = clamp((try c.decodeIfPresent(Double.self, forKey: .backgroundOpacity) ?? 0.6).finiteOr(0.6), 0.1, 1)
     }
 
     /// The reference point for "left/right/above" — the first person prop, else stage center.

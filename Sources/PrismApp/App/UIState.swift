@@ -76,6 +76,9 @@ final class UIState {
     var toasts: [Toast] = []
     /// Set while the screenshot tour drives the UI (disables onboarding, animations that never settle).
     var isRunningTour = false
+    /// A look being previewed blind (e.g. while hovering it in the sidebar): the stage draws it
+    /// outlined/dimmed without touching the live output. `nil` = show what the lights are doing.
+    var previewLookID: UUID?
 
     func toast(_ message: String, style: Toast.Style = .info, systemImage: String = "sparkles", duration: Double = 2.6) {
         let t = Toast(message: message, style: style, systemImage: systemImage, duration: duration)
