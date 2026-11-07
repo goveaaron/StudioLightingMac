@@ -70,20 +70,64 @@ public struct StageTransform: Codable, Hashable, Sendable {
 
 /// Per-fixture safety/creative limits.
 public struct FixtureLimits: Codable, Hashable, Sendable {
-    /// Output intensity is scaled into [minIntensity, maxIntensity] (0…1).
+    /// Output intensity is scaled/clamped into [minIntensity, maxIntensity] (0…1).
     public var maxIntensity: Double
     public var minIntensity: Double
     /// If false, effects/music mode never touch this fixture (e.g. the key light while filming).
     public var allowEffects: Bool
     /// If false, strobing is suppressed entirely.
     public var allowStrobe: Bool
+    /// When true, this fixture is protected from effects, music mode, and remote changes
+    /// unless explicitly targeted from the UI.
+    public var protected: Bool
+    /// Optional Kelvin lower bound for this fixture.
+    public var minKelvin: Double?
+    /// Optional Kelvin upper bound for this fixture.
+    public var maxKelvin: Double?
 
-    public init(maxIntensity: Double = 1, minIntensity: Double = 0, allowEffects: Bool = true, allowStrobe: Bool = true) {
-        self.maxIntensity = maxIntensity; self.minIntensity = minIntensity
-        self.allowEffects = allowEffects; self.allowStrobe = allowStrobe
+    public init(maxIntensity: Double = 1, minIntensity: Double = 0, allowEffects: Bool = true, allowStrobe: Bool = true,
+                protected: Bool = false, minKelvin: Double? = nil, maxKelvin: Double? = nil) {
+        let lo = clamp01(minIntensity.finiteOr(0))
+        let hi = max(lo, clamp01(maxIntensity.finiteOr(1)))
+        self.minIntensity = lo
+        self.maxIntensity = hi
+        self.allowEffects = allowEffects
+        self.allowStrobe = allowStrobe
+        self.protected = protected
+        let kLo = minKelvin.map { clamp($0.finiteOr(1700), 1000, 20000) }
+        let kHi = maxKelvin.map { clamp($0.finiteOr(12000), 1000, 20000) }
+        if let loK = kLo, let hiK = kHi, hiK < loK {
+            self.minKelvin = loK
+            self.maxKelvin = loK
+        } else {
+            self.minKelvin = kLo
+            self.maxKelvin = kHi
+        }
     }
 
     public static let `default` = FixtureLimits()
+
+    public var sanitized: FixtureLimits {
+        FixtureLimits(maxIntensity: maxIntensity, minIntensity: minIntensity, allowEffects: allowEffects,
+                      allowStrobe: allowStrobe, protected: protected, minKelvin: minKelvin, maxKelvin: maxKelvin)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case maxIntensity, minIntensity, allowEffects, allowStrobe, protected, minKelvin, maxKelvin
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let minI = (try c.decodeIfPresent(Double.self, forKey: .minIntensity) ?? 0).finiteOr(0)
+        let maxI = (try c.decodeIfPresent(Double.self, forKey: .maxIntensity) ?? 1).finiteOr(1)
+        let allowFX = try c.decodeIfPresent(Bool.self, forKey: .allowEffects) ?? true
+        let allowStr = try c.decodeIfPresent(Bool.self, forKey: .allowStrobe) ?? true
+        let prot = try c.decodeIfPresent(Bool.self, forKey: .protected) ?? false
+        let minK = try c.decodeIfPresent(Double.self, forKey: .minKelvin)
+        let maxK = try c.decodeIfPresent(Double.self, forKey: .maxKelvin)
+        self.init(maxIntensity: maxI, minIntensity: minI, allowEffects: allowFX, allowStrobe: allowStr,
+                  protected: prot, minKelvin: minK, maxKelvin: maxK)
+    }
 }
 
 /// Per-fixture color calibration so different lights match each other and the screen.
@@ -173,6 +217,12 @@ public struct PatchedFixture: Codable, Hashable, Sendable, Identifiable {
     public var stageLabel: String { shortName.isEmpty ? name : shortName }
 
     public var isPatched: Bool { address != nil }
+
+    /// True when this fixture is protected from effects, music mode, and remote changes
+    /// (key/fill role, `limits.protected`, or `limits.allowEffects == false`).
+    public var isProtected: Bool {
+        role == .key || role == .fill || limits.protected || !limits.allowEffects
+    }
 }
 
 /// A saved set of fixtures ("All Tubes", "Background", "Key & Fill").

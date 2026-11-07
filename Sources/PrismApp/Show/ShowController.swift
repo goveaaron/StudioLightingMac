@@ -71,6 +71,8 @@ final class ShowController {
     var fixtures: [PatchedFixture] { document.project.fixtures }
     var looks: [Look] { document.project.looks }
     var activeLook: Look? { document.live.activeLookID.flatMap { document.project.look($0) } }
+    var fadeProgress: Double? { engine.latestFrame.fadeProgress ?? document.live.fadeProgress(at: PrismClock.now()) }
+    var isFading: Bool { fadeProgress != nil }
 
     /// Fixtures with their definitions resolved (cached per revision).
     var resolvedFixtures: [ResolvedFixture] {
@@ -121,6 +123,8 @@ final class ShowController {
     private func maintenance() {
         let now = PrismClock.now()
         let hasExpired = document.live.fades.values.contains { $0.isFinished(at: now) }
+            || document.live.effectFades.values.contains { $0.isFinished(at: now) }
+            || (document.live.musicFade?.isFinished(at: now) ?? false)
             || document.live.identify.values.contains { now - $0 > 2.5 }
         guard hasExpired else { return }
         document.live.pruneExpired(at: now)
@@ -142,14 +146,17 @@ final class ShowController {
         let before = document
         var doc = document
         let executor = CommandExecutor(library: library.lookup, defaultFade: 0)
+        let latest = engine.latestFrame
+        let currentRendered = latest.preMasterStates.isEmpty ? latest.states : latest.preMasterStates
         let result = executor.apply(commands, to: &doc, selection: selectedIDs(),
-                                    currentRendered: engine.latestFrame.states)
+                                    currentRendered: currentRendered, origin: origin)
         lastResult = result
         guard doc != before else { return result }
         var change: ShowChange = [.live]
         if doc.project.looks != before.project.looks { change.insert(.looks) }
+        if doc.project.fixtures != before.project.fixtures { change.insert(.patch) }
         commit(doc, before: before, undoName: undoName ?? CommandNaming.name(for: commands), coalesceKey: coalesceKey,
-               change: change, marksDirty: change.contains(.looks))
+               change: change, marksDirty: change.contains(.looks) || change.contains(.patch))
         return result
     }
 
@@ -163,16 +170,26 @@ final class ShowController {
         let before = document
         var doc = document
         let now = PrismClock.now()
-        let rendered = engine.latestFrame.states
+        let latest = engine.latestFrame
+        let rendered = latest.preMasterStates.isEmpty ? latest.states : latest.preMasterStates
         for id in ids {
             let old = doc.live.base[id] ?? .off
             var new = old
             body(id, &new)
             new.intensity = clamp01(new.intensity.finiteOr(0))
             new.color = new.color.sanitized
+            if let rf = doc.project.fixture(id) {
+                let lim = rf.limits.sanitized
+                if new.intensity > 0 {
+                    new.intensity = clamp(new.intensity, lim.minIntensity, lim.maxIntensity)
+                } else if lim.minIntensity > 0 {
+                    new.intensity = lim.minIntensity
+                }
+            }
             guard new != old else { continue }
             if fade > 0 {
-                doc.live.fades[id] = FixtureFade(from: rendered[id] ?? old, startTime: now, duration: fade)
+                let startState = doc.live.effectiveBaseState(of: id, at: now, currentRendered: rendered)
+                doc.live.fades[id] = FixtureFade(from: startState, startTime: now, duration: fade)
             } else {
                 doc.live.fades[id] = nil
             }
@@ -503,17 +520,23 @@ enum CommandNaming {
         guard let first = commands.first(where: { if case .fadeTime = $0 { return false }; return true }) else { return "Change" }
         switch first {
         case .setIntensity, .adjustIntensity: return "Brightness"
-        case .setColor, .shiftColor, .adjustSaturation, .gradient: return "Color"
+        case .setColor, .shiftColor, .adjustSaturation, .gradient, .swapColors: return "Color"
+        case .setCells, .paintCells: return "Paint Pixels"
         case .setKelvin, .adjustKelvin, .setTint, .adjustTint: return "White Balance"
         case .turnOn: return "Turn On"
         case .turnOff: return "Turn Off"
         case .recallLook: return "Recall Look"
         case .saveLook: return "Save Look"
+        case .copyLook: return "Copy Look"
         case .startEffect: return "Start Effect"
+        case .setEffectParameters: return "Effect Settings"
         case .stopEffects, .stopAllEffects: return "Stop Effects"
         case .setMusicMode: return "Music Mode"
         case .setGrandMaster: return "Master"
         case .setBlackout: return "Blackout"
+        case .setFixtureProtection: return "Fixture Protection"
+        case .setRecordingMode: return "Recording Mode"
+        case .freeze: return "Freeze Output"
         case .identify: return "Identify"
         case .fadeTime: return "Change"
         }
