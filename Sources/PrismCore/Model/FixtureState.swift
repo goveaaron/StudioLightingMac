@@ -19,6 +19,15 @@ public struct CellState: Codable, Hashable, Sendable {
             color: LightColor.mix(a.color, b.color, t)
         )
     }
+
+    private enum CodingKeys: String, CodingKey { case intensity, color }
+
+    /// Decodes defensively: out-of-range or corrupt values from files are clamped/repaired.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        intensity = clamp01((c.decodeLenient(Double.self, forKey: .intensity) ?? 1).finiteOr(1))
+        color = (c.decodeLenient(LightColor.self, forKey: .color) ?? .white).sanitized
+    }
 }
 
 /// What a light should be doing, independent of its DMX mode.
@@ -96,13 +105,22 @@ public struct FixtureState: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case intensity, color, cells, strobeHz, raw }
 
+    /// Maximum pixel cells accepted from files (real fixtures have at most a few hundred).
+    public static let maxCells = 1024
+
+    /// Decodes defensively: every field is optional, clamped and repaired (never throws for bad values).
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        intensity = clamp01((try c.decodeIfPresent(Double.self, forKey: .intensity) ?? 0).finiteOr(0))
-        color = try c.decodeIfPresent(LightColor.self, forKey: .color) ?? .white
-        cells = try c.decodeIfPresent([CellState].self, forKey: .cells)
-        strobeHz = clamp((try c.decodeIfPresent(Double.self, forKey: .strobeHz) ?? 0).finiteOr(0), 0, 30)
-        if let rawDict = try c.decodeIfPresent([String: Int].self, forKey: .raw) {
+        intensity = clamp01((c.decodeLenient(Double.self, forKey: .intensity) ?? 0).finiteOr(0))
+        color = (c.decodeLenient(LightColor.self, forKey: .color) ?? .white).sanitized
+        if let decoded = c.decodeTolerantArray(CellState.self, forKey: .cells, limit: FixtureState.maxCells),
+           !decoded.values.isEmpty {
+            cells = decoded.values
+        } else {
+            cells = nil
+        }
+        strobeHz = clamp((c.decodeLenient(Double.self, forKey: .strobeHz) ?? 0).finiteOr(0), 0, 30)
+        if let rawDict = c.decodeLenient([String: Int].self, forKey: .raw) {
             var r: [Int: UInt8] = [:]
             for (k, v) in rawDict { if let i = Int(k), i >= 0, i < 4096 { r[i] = UInt8(clamp(v, 0, 255)) } }
             raw = r.isEmpty ? nil : r
@@ -142,10 +160,14 @@ public struct FixtureStateMap: Codable, Hashable, Sendable, Sequence {
 
     public func makeIterator() -> Dictionary<UUID, FixtureState>.Iterator { storage.makeIterator() }
 
+    /// Decodes tolerantly: entries with invalid keys or corrupt states are dropped, the rest survive.
     public init(from decoder: Decoder) throws {
-        let dict = try decoder.singleValueContainer().decode([String: FixtureState].self)
+        let dict = try decoder.singleValueContainer().decode([String: TolerantElement<FixtureState>].self)
         var s: [UUID: FixtureState] = [:]
-        for (k, v) in dict { if let id = UUID(uuidString: k) { s[id] = v } }
+        s.reserveCapacity(dict.count)
+        for (k, v) in dict {
+            if let id = UUID(uuidString: k), let state = v.value { s[id] = state }
+        }
         storage = s
     }
 

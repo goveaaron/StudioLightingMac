@@ -77,7 +77,7 @@ public struct UndoHistory: Sendable {
            var last = undoStack.last,
            last.coalesceKey == key,
            last.origin == origin,
-           now - last.time < coalesceWindow {
+           key == activeInteractionKey || now - last.time < coalesceWindow {
             last.time = now
             last.timestamp = timestamp
             if let summary, !summary.isEmpty { last.summary = summary }
@@ -101,6 +101,29 @@ public struct UndoHistory: Sendable {
             undoStack.removeFirst(undoStack.count - limit)
         }
         redoStack.removeAll()
+    }
+
+    /// While set, changes with this coalesce key merge into one step regardless of `coalesceWindow`
+    /// (e.g. a slider drag with pauses).
+    public private(set) var activeInteractionKey: String?
+
+    /// Starts an interactive change (slider/drag began): all changes recorded with `key` until
+    /// `endInteraction()` become a single undo step.
+    public mutating func beginInteraction(key: String) {
+        if activeInteractionKey != key { breakCoalescing() }
+        activeInteractionKey = key
+    }
+
+    /// Ends the interactive change (drag ended); the next change starts a new undo step.
+    public mutating func endInteraction() {
+        activeInteractionKey = nil
+        breakCoalescing()
+    }
+
+    /// Prevents the next recorded change from merging into the latest undo step.
+    public mutating func breakCoalescing() {
+        guard !undoStack.isEmpty else { return }
+        undoStack[undoStack.count - 1].coalesceKey = nil
     }
 
     /// Returns the document to restore, pushing `current` onto the redo stack.
@@ -169,6 +192,7 @@ public struct UndoHistory: Sendable {
     public mutating func clear() {
         undoStack.removeAll()
         redoStack.removeAll()
+        activeInteractionKey = nil
     }
 
     /// Fades, identify flashes and raw test values are never part of undo.

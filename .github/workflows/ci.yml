@@ -283,9 +283,14 @@ jobs:
           codesign -dr - "$APP"
           defaults read "$APP/Contents/Info" CFBundleShortVersionString
           du -sh "$APP"
+      # GitHub's Intel runners are GPU-less VMs where Apple's Metal loader aborts as soon as
+      # anything renders ("Target device architecture is nil"); real Intel Macs have a GPU. There
+      # the GUI steps are informational — install, slices, signature and update still gate.
       - name: Self-test (installed app)
+        continue-on-error: ${{ matrix.os == 'macos-15-intel' }}
         run: scripts/mac-timeout.sh 300 /Applications/Prism.app/Contents/MacOS/Prism --self-test
       - name: Launch like a user and quit
+        continue-on-error: ${{ matrix.os == 'macos-15-intel' }}
         run: |
           mkdir -p "$RUNNER_TEMP/shots"
           open /Applications/Prism.app

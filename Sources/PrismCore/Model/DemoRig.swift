@@ -2,15 +2,16 @@ import Foundation
 
 /// Built-in demo / template projects.
 ///
-/// `londonStudio()` mirrors the layout of the studio Prism was designed for (from the owner's
-/// Lightkey screenshot): a round dimmer (P1), eight 16-pixel tubes (B1–B8) around the subject and
-/// a square RGBWW panel (PN1). It uses generic profiles so it works without the curated library;
-/// once the real models are known the fixtures can be swapped with "Replace fixture type".
+/// `londonStudio()` mirrors the studio Prism was designed for (from the owner's Lightkey
+/// screenshot): a round dimmer (P1), eight amaran PT4c pixel tubes (B1–B8) around the subject in
+/// their recommended "LE CCT&RGB 8 px" mode (8 zones × intensity, CCT, ±green, crossfade, R, G, B)
+/// and an amaran F22c key panel (PN1), all in Universe 1. The profiles come from the curated
+/// library; fixtures can be swapped with "Replace fixture type" if the real models differ.
 public enum DemoRig {
-    public static let pixelTubeID = "generic.pixel-tube"
-    public static let pixelTubeMode = "Dimmer + 16 × RGB"
-    public static let panelID = "generic.rgbww"
-    public static let panelMode = "Dimmer + RGBWW"
+    public static let pixelTubeID = "amaran.pt4c"
+    public static let pixelTubeMode = "Light Engine CCT & RGB 8 Pixels"
+    public static let panelID = "amaran.f22c"
+    public static let panelMode = "CCT & RGB 8-bit"
     public static let dimmerID = "generic.dimmer"
     public static let dimmerMode = "8-bit"
 
@@ -37,25 +38,26 @@ public enum DemoRig {
         }
 
         // Stage is portrait like the owner's Lightkey canvas: 5.2 m wide × 9.2 m deep.
+        // Total footprint: 1 (P1) + 8 × 56 (PT4c 8-px) + 10 (F22c) = 459 channels in Universe 1.
         add(IDs.p1, name: "Round Light", short: "P1", def: dimmerID, mode: dimmerMode, channels: 1,
             role: .practical, x: 1.43, y: 1.33, depth: 0.95)
-        add(IDs.tube(1), name: "Tube Left", short: "B1", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(1), name: "Tube Left", short: "B1", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .background, x: 1.01, y: 6.04, rotation: 270, depth: 0.6)
-        add(IDs.tube(2), name: "Tube Back Left", short: "B2", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(2), name: "Tube Back Left", short: "B2", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .background, x: 1.34, y: 3.92, depth: 0.9)
-        add(IDs.tube(3), name: "Tube Back Right", short: "B3", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(3), name: "Tube Back Right", short: "B3", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .background, x: 3.35, y: 3.92, depth: 0.9)
-        add(IDs.tube(4), name: "Tube Back Center", short: "B4", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(4), name: "Tube Back Center", short: "B4", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .background, x: 2.52, y: 4.73, depth: 0.8)
-        add(IDs.tube(5), name: "Tube Right", short: "B5", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(5), name: "Tube Right", short: "B5", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .background, x: 3.94, y: 6.06, rotation: 90, depth: 0.6)
-        add(IDs.tube(6), name: "Floor Tube 2", short: "B6", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(6), name: "Floor Tube 2", short: "B6", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .accent, x: 3.42, y: 7.61, rotation: 305, depth: 0.25)
-        add(IDs.tube(7), name: "Floor Tube 1", short: "B7", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(7), name: "Floor Tube 1", short: "B7", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .accent, x: 3.13, y: 7.59, rotation: 305, depth: 0.25)
-        add(IDs.tube(8), name: "Floor Tube 3", short: "B8", def: pixelTubeID, mode: pixelTubeMode, channels: 49,
+        add(IDs.tube(8), name: "Floor Tube 3", short: "B8", def: pixelTubeID, mode: pixelTubeMode, channels: 56,
             role: .accent, x: 3.73, y: 7.66, rotation: 305, depth: 0.25)
-        add(IDs.pn1, name: "Key Panel", short: "PN1", def: panelID, mode: panelMode, channels: 6,
+        add(IDs.pn1, name: "Key Panel", short: "PN1", def: panelID, mode: panelMode, channels: 10,
             role: .key, x: 1.19, y: 8.2, depth: 0.05)
 
         let tubes = (1...8).map { IDs.tube($0) }
@@ -81,7 +83,7 @@ public enum DemoRig {
             return m
         }
         func on(_ c: LightColor, _ i: Double = 1) -> FixtureState { FixtureState(intensity: i, color: c) }
-        func gradient(_ a: LightColor, _ b: LightColor, cells: Int = 16, _ i: Double = 1) -> FixtureState {
+        func gradient(_ a: LightColor, _ b: LightColor, cells: Int = 8, _ i: Double = 1) -> FixtureState {
             let cs = (0..<cells).map { idx -> CellState in
                 CellState(intensity: 1, color: LightColor.mix(a, b, Double(idx) / Double(max(cells - 1, 1))))
             }
