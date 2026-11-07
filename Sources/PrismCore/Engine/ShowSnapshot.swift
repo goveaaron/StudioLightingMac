@@ -65,6 +65,54 @@ public enum SpatialLayout {
         }
         return out
     }
+
+    /// Computes per-fixture crossfade delays ("wave across the room" by stage position).
+    public static func delays(for fixtureIDs: [UUID], fixtures: [ResolvedFixture], stage: StageSettings,
+                              totalDelay: Double, direction: EffectDirection = .leftToRight,
+                              explicitDelays: [UUID: Double] = [:]) -> [UUID: Double] {
+        var result: [UUID: Double] = [:]
+        let clampedTotal = clamp(totalDelay.finiteOr(0), 0, 60)
+        if clampedTotal > 0, fixtureIDs.count > 1 {
+            let geo = compute(fixtures: fixtures, stage: stage)
+            let byID = Dictionary(fixtures.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            var coords: [(UUID, Double)] = []
+            coords.reserveCapacity(fixtureIDs.count)
+            for id in fixtureIDs {
+                let p = geo[id]?.center ?? byID[id].map {
+                    SIMDPoint($0.fixture.transform.x / max(stage.width, 0.1), $0.fixture.transform.y / max(stage.height, 0.1))
+                } ?? SIMDPoint(0.5, 0.5)
+                let metric: Double
+                switch direction {
+                case .leftToRight: metric = p.x
+                case .rightToLeft: metric = -p.x
+                case .topToBottom: metric = p.y
+                case .bottomToTop: metric = -p.y
+                case .outward:
+                    let dx = p.x - 0.5, dy = p.y - 0.5
+                    metric = (dx * dx + dy * dy).squareRoot()
+                case .inward:
+                    let dx = p.x - 0.5, dy = p.y - 0.5
+                    metric = -(dx * dx + dy * dy).squareRoot()
+                case .random:
+                    var h: UInt64 = 1469598103934665603
+                    for b in id.uuidString.utf8 { h = (h ^ UInt64(b)) &* 1099511628211 }
+                    metric = Double(h % 10000) / 10000.0
+                }
+                coords.append((id, metric))
+            }
+            let lo = coords.map(\.1).min() ?? 0
+            let hi = coords.map(\.1).max() ?? 1
+            let span = hi - lo
+            for (id, m) in coords {
+                let u = span > 1e-6 ? clamp01((m - lo) / span) : 0
+                result[id] = u * clampedTotal
+            }
+        }
+        for (id, d) in explicitDelays {
+            result[id] = clamp(d.finiteOr(0), 0, 60)
+        }
+        return result
+    }
 }
 
 /// Immutable description of everything the engine needs to render frames.
@@ -107,11 +155,25 @@ public struct RenderedFrame: Sendable {
     /// Final device-independent state per fixture (after fades, effects, music, masters).
     /// Use this to draw the visualizer — it is exactly what the lights are doing.
     public var states: [UUID: FixtureState]
+    /// States after fades, effects, and music, before grand master, blackout, and identify flashes.
+    /// Used as the seamless starting point when a new fade interrupts an in-progress fade.
+    public var preMasterStates: [UUID: FixtureState]
     /// DMX data per universe (1-based universe → 512 bytes).
     public var universes: [Int: [UInt8]]
+    /// Overall crossfade progress 0…1 if any fade is currently active, otherwise `nil`.
+    public var fadeProgress: Double?
 
-    public init(time: Double = 0, frameNumber: UInt64 = 0, states: [UUID: FixtureState] = [:], universes: [Int: [UInt8]] = [:]) {
-        self.time = time; self.frameNumber = frameNumber; self.states = states; self.universes = universes
+    public var isFading: Bool { fadeProgress != nil }
+
+    public init(time: Double = 0, frameNumber: UInt64 = 0, states: [UUID: FixtureState] = [:],
+                preMasterStates: [UUID: FixtureState]? = nil, universes: [Int: [UInt8]] = [:],
+                fadeProgress: Double? = nil) {
+        self.time = time
+        self.frameNumber = frameNumber
+        self.states = states
+        self.preMasterStates = preMasterStates ?? states
+        self.universes = universes
+        self.fadeProgress = fadeProgress
     }
 
     public static let empty = RenderedFrame()

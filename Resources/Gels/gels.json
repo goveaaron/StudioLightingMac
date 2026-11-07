@@ -1,0 +1,5520 @@
+[
+  {
+    "category" : "cto",
+    "cieX" : 0.459,
+    "cieY" : 0.41,
+    "id" : "L204",
+    "manufacturer" : "LEE",
+    "miredShift" : 131,
+    "name" : "Full C.T. Orange",
+    "number" : "204",
+    "rgb" : {
+      "b" : 0.3411764705882353,
+      "g" : 0.6627450980392157,
+      "r" : 1
+    },
+    "transmission" : 0.55
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.398,
+    "cieY" : 0.388,
+    "id" : "L205",
+    "manufacturer" : "LEE",
+    "miredShift" : 81,
+    "name" : "1\/2 C.T. Orange",
+    "number" : "205",
+    "rgb" : {
+      "b" : 0.5372549019607843,
+      "g" : 0.7686274509803922,
+      "r" : 1
+    },
+    "transmission" : 0.71
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.358,
+    "cieY" : 0.365,
+    "id" : "L206",
+    "manufacturer" : "LEE",
+    "miredShift" : 42,
+    "name" : "1\/4 C.T. Orange",
+    "number" : "206",
+    "rgb" : {
+      "b" : 0.7019607843137254,
+      "g" : 0.8509803921568627,
+      "r" : 1
+    },
+    "transmission" : 0.79
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.336,
+    "cieY" : 0.348,
+    "id" : "L223",
+    "manufacturer" : "LEE",
+    "miredShift" : 26,
+    "name" : "1\/8 C.T. Orange",
+    "number" : "223",
+    "rgb" : {
+      "b" : 0.8274509803921568,
+      "g" : 0.9176470588235294,
+      "r" : 1
+    },
+    "transmission" : 0.85
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.431,
+    "cieY" : 0.401,
+    "id" : "L285",
+    "manufacturer" : "LEE",
+    "miredShift" : 109,
+    "name" : "3\/4 C.T. Orange",
+    "number" : "285",
+    "rgb" : {
+      "b" : 0.4196078431372549,
+      "g" : 0.7098039215686275,
+      "r" : 1
+    },
+    "transmission" : 0.61
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.525,
+    "cieY" : 0.415,
+    "id" : "L287",
+    "manufacturer" : "LEE",
+    "miredShift" : 245,
+    "name" : "Double C.T. Orange",
+    "number" : "287",
+    "rgb" : {
+      "b" : 0.11764705882352941,
+      "g" : 0.5098039215686274,
+      "r" : 1
+    },
+    "transmission" : 0.32
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.459,
+    "cieY" : 0.41,
+    "id" : "L208",
+    "manufacturer" : "LEE",
+    "miredShift" : 131,
+    "name" : "Full C.T. Orange + .6 ND",
+    "number" : "208",
+    "rgb" : {
+      "b" : 0.27450980392156865,
+      "g" : 0.5647058823529412,
+      "r" : 0.8745098039215686
+    },
+    "transmission" : 0.14
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.456,
+    "cieY" : 0.422,
+    "id" : "L441",
+    "manufacturer" : "LEE",
+    "miredShift" : 131,
+    "name" : "Full C.T. Straw",
+    "number" : "441",
+    "rgb" : {
+      "b" : 0.3607843137254902,
+      "g" : 0.7137254901960784,
+      "r" : 1
+    },
+    "transmission" : 0.57
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.396,
+    "cieY" : 0.396,
+    "id" : "L442",
+    "manufacturer" : "LEE",
+    "miredShift" : 81,
+    "name" : "1\/2 C.T. Straw",
+    "number" : "442",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.8,
+      "r" : 1
+    },
+    "transmission" : 0.71
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.357,
+    "cieY" : 0.371,
+    "id" : "L443",
+    "manufacturer" : "LEE",
+    "miredShift" : 42,
+    "name" : "1\/4 C.T. Straw",
+    "number" : "443",
+    "rgb" : {
+      "b" : 0.7137254901960784,
+      "g" : 0.8745098039215686,
+      "r" : 1
+    },
+    "transmission" : 0.79
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.335,
+    "cieY" : 0.351,
+    "id" : "L444",
+    "manufacturer" : "LEE",
+    "miredShift" : 26,
+    "name" : "1\/8 C.T. Straw",
+    "number" : "444",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.9294117647058824,
+      "r" : 1
+    },
+    "transmission" : 0.85
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.46,
+    "cieY" : 0.41,
+    "id" : "R3407",
+    "manufacturer" : "Rosco",
+    "miredShift" : 131,
+    "name" : "Roscosun CTO",
+    "number" : "3407",
+    "rgb" : {
+      "b" : 0.32941176470588235,
+      "g" : 0.6588235294117647,
+      "r" : 1
+    },
+    "transmission" : 0.55
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.398,
+    "cieY" : 0.388,
+    "id" : "R3408",
+    "manufacturer" : "Rosco",
+    "miredShift" : 81,
+    "name" : "Roscosun 1\/2 CTO",
+    "number" : "3408",
+    "rgb" : {
+      "b" : 0.5411764705882353,
+      "g" : 0.7725490196078432,
+      "r" : 1
+    },
+    "transmission" : 0.73
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.358,
+    "cieY" : 0.365,
+    "id" : "R3409",
+    "manufacturer" : "Rosco",
+    "miredShift" : 42,
+    "name" : "Roscosun 1\/4 CTO",
+    "number" : "3409",
+    "rgb" : {
+      "b" : 0.7058823529411765,
+      "g" : 0.8549019607843137,
+      "r" : 1
+    },
+    "transmission" : 0.81
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.333,
+    "cieY" : 0.345,
+    "id" : "R3410",
+    "manufacturer" : "Rosco",
+    "miredShift" : 20,
+    "name" : "Roscosun 1\/8 CTO",
+    "number" : "3410",
+    "rgb" : {
+      "b" : 0.8352941176470589,
+      "g" : 0.9215686274509803,
+      "r" : 1
+    },
+    "transmission" : 0.92
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.431,
+    "cieY" : 0.401,
+    "id" : "R3411",
+    "manufacturer" : "Rosco",
+    "miredShift" : 109,
+    "name" : "Roscosun 3\/4 CTO",
+    "number" : "3411",
+    "rgb" : {
+      "b" : 0.4235294117647059,
+      "g" : 0.7137254901960784,
+      "r" : 1
+    },
+    "transmission" : 0.62
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.528,
+    "cieY" : 0.415,
+    "id" : "R3420",
+    "manufacturer" : "Rosco",
+    "miredShift" : 250,
+    "name" : "Roscosun Double CTO",
+    "number" : "3420",
+    "rgb" : {
+      "b" : 0.10588235294117647,
+      "g" : 0.5019607843137255,
+      "r" : 1
+    },
+    "transmission" : 0.3
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.461,
+    "cieY" : 0.411,
+    "id" : "R3401",
+    "manufacturer" : "Rosco",
+    "miredShift" : 131,
+    "name" : "Roscosun 85",
+    "number" : "3401",
+    "rgb" : {
+      "b" : 0.30980392156862746,
+      "g" : 0.6470588235294118,
+      "r" : 1
+    },
+    "transmission" : 0.58
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.456,
+    "cieY" : 0.422,
+    "id" : "R3441",
+    "manufacturer" : "Rosco",
+    "miredShift" : 131,
+    "name" : "Full Straw (CTS)",
+    "number" : "3441",
+    "rgb" : {
+      "b" : 0.35294117647058826,
+      "g" : 0.7098039215686275,
+      "r" : 1
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.396,
+    "cieY" : 0.396,
+    "id" : "R3442",
+    "manufacturer" : "Rosco",
+    "miredShift" : 81,
+    "name" : "1\/2 Straw (1\/2 CTS)",
+    "number" : "3442",
+    "rgb" : {
+      "b" : 0.5411764705882353,
+      "g" : 0.8,
+      "r" : 1
+    },
+    "transmission" : 0.72
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.357,
+    "cieY" : 0.371,
+    "id" : "R3443",
+    "manufacturer" : "Rosco",
+    "miredShift" : 42,
+    "name" : "1\/4 Straw (1\/4 CTS)",
+    "number" : "3443",
+    "rgb" : {
+      "b" : 0.7058823529411765,
+      "g" : 0.8745098039215686,
+      "r" : 1
+    },
+    "transmission" : 0.81
+  },
+  {
+    "category" : "cto",
+    "cieX" : 0.335,
+    "cieY" : 0.351,
+    "id" : "R3444",
+    "manufacturer" : "Rosco",
+    "miredShift" : 20,
+    "name" : "1\/8 Straw (1\/8 CTS)",
+    "number" : "3444",
+    "rgb" : {
+      "b" : 0.8392156862745098,
+      "g" : 0.9333333333333333,
+      "r" : 1
+    },
+    "transmission" : 0.9
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.232,
+    "cieY" : 0.238,
+    "id" : "L200",
+    "manufacturer" : "LEE",
+    "miredShift" : -274,
+    "name" : "Double C.T. Blue",
+    "number" : "200",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.6392156862745098,
+      "r" : 0.4117647058823529
+    },
+    "transmission" : 0.14
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.273,
+    "cieY" : 0.285,
+    "id" : "L201",
+    "manufacturer" : "LEE",
+    "miredShift" : -137,
+    "name" : "Full C.T. Blue",
+    "number" : "201",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7607843137254902,
+      "r" : 0.5882352941176471
+    },
+    "transmission" : 0.36
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.285,
+    "cieY" : 0.299,
+    "id" : "L281",
+    "manufacturer" : "LEE",
+    "miredShift" : -103,
+    "name" : "3\/4 C.T. Blue",
+    "number" : "281",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8117647058823529,
+      "r" : 0.6666666666666666
+    },
+    "transmission" : 0.44
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.297,
+    "cieY" : 0.313,
+    "id" : "L202",
+    "manufacturer" : "LEE",
+    "miredShift" : -68,
+    "name" : "1\/2 C.T. Blue",
+    "number" : "202",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8588235294117647,
+      "r" : 0.7450980392156863
+    },
+    "transmission" : 0.55
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.308,
+    "cieY" : 0.326,
+    "id" : "L203",
+    "manufacturer" : "LEE",
+    "miredShift" : -35,
+    "name" : "1\/4 C.T. Blue",
+    "number" : "203",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9176470588235294,
+      "r" : 0.8470588235294118
+    },
+    "transmission" : 0.69
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.314,
+    "cieY" : 0.333,
+    "id" : "L218",
+    "manufacturer" : "LEE",
+    "miredShift" : -18,
+    "name" : "1\/8 C.T. Blue",
+    "number" : "218",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9529411764705882,
+      "r" : 0.9176470588235294
+    },
+    "transmission" : 0.81
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.234,
+    "cieY" : 0.24,
+    "id" : "R3220",
+    "manufacturer" : "Rosco",
+    "miredShift" : -260,
+    "name" : "Double Blue (2x CTB)",
+    "number" : "3220",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.6313725490196078,
+      "r" : 0.40784313725490196
+    },
+    "transmission" : 0.13
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.274,
+    "cieY" : 0.286,
+    "id" : "R3202",
+    "manufacturer" : "Rosco",
+    "miredShift" : -131,
+    "name" : "Full Blue (CTB)",
+    "number" : "3202",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7568627450980392,
+      "r" : 0.5843137254901961
+    },
+    "transmission" : 0.36
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.286,
+    "cieY" : 0.3,
+    "id" : "R3203",
+    "manufacturer" : "Rosco",
+    "miredShift" : -100,
+    "name" : "3\/4 Blue (3\/4 CTB)",
+    "number" : "3203",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.807843137254902,
+      "r" : 0.6627450980392157
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.297,
+    "cieY" : 0.313,
+    "id" : "R3204",
+    "manufacturer" : "Rosco",
+    "miredShift" : -68,
+    "name" : "1\/2 Blue (1\/2 CTB)",
+    "number" : "3204",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8549019607843137,
+      "r" : 0.7411764705882353
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.303,
+    "cieY" : 0.32,
+    "id" : "R3206",
+    "manufacturer" : "Rosco",
+    "miredShift" : -49,
+    "name" : "1\/3 Blue (1\/3 CTB)",
+    "number" : "3206",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8941176470588236,
+      "r" : 0.807843137254902
+    },
+    "transmission" : 0.64
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.308,
+    "cieY" : 0.326,
+    "id" : "R3208",
+    "manufacturer" : "Rosco",
+    "miredShift" : -35,
+    "name" : "1\/4 Blue (1\/4 CTB)",
+    "number" : "3208",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9215686274509803,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.74
+  },
+  {
+    "category" : "ctb",
+    "cieX" : 0.314,
+    "cieY" : 0.333,
+    "id" : "R3216",
+    "manufacturer" : "Rosco",
+    "miredShift" : -18,
+    "name" : "1\/8 Blue (1\/8 CTB)",
+    "number" : "3216",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9529411764705882,
+      "r" : 0.9176470588235294
+    },
+    "transmission" : 0.84
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.325,
+    "cieY" : 0.415,
+    "id" : "L244",
+    "manufacturer" : "LEE",
+    "name" : "Full Plus Green",
+    "number" : "244",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 1,
+      "r" : 0.7019607843137254
+    },
+    "tintShift" : -1,
+    "transmission" : 0.74
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.32,
+    "cieY" : 0.375,
+    "id" : "L245",
+    "manufacturer" : "LEE",
+    "name" : "1\/2 Plus Green",
+    "number" : "245",
+    "rgb" : {
+      "b" : 0.7490196078431373,
+      "g" : 1,
+      "r" : 0.807843137254902
+    },
+    "tintShift" : -0.5,
+    "transmission" : 0.82
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.316,
+    "cieY" : 0.352,
+    "id" : "L246",
+    "manufacturer" : "LEE",
+    "name" : "1\/4 Plus Green",
+    "number" : "246",
+    "rgb" : {
+      "b" : 0.8627450980392157,
+      "g" : 1,
+      "r" : 0.8941176470588236
+    },
+    "tintShift" : -0.25,
+    "transmission" : 0.86
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.314,
+    "cieY" : 0.34,
+    "id" : "L278",
+    "manufacturer" : "LEE",
+    "name" : "1\/8 Plus Green",
+    "number" : "278",
+    "rgb" : {
+      "b" : 0.9254901960784314,
+      "g" : 1,
+      "r" : 0.9450980392156862
+    },
+    "tintShift" : -0.125,
+    "transmission" : 0.89
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.345,
+    "cieY" : 0.268,
+    "id" : "L247",
+    "manufacturer" : "LEE",
+    "name" : "Full Minus Green",
+    "number" : "247",
+    "rgb" : {
+      "b" : 0.8862745098039215,
+      "g" : 0.6666666666666666,
+      "r" : 1
+    },
+    "tintShift" : 1,
+    "transmission" : 0.55
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.33,
+    "cieY" : 0.298,
+    "id" : "L248",
+    "manufacturer" : "LEE",
+    "name" : "1\/2 Minus Green",
+    "number" : "248",
+    "rgb" : {
+      "b" : 0.9294117647058824,
+      "g" : 0.788235294117647,
+      "r" : 1
+    },
+    "tintShift" : 0.5,
+    "transmission" : 0.72
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.321,
+    "cieY" : 0.314,
+    "id" : "L249",
+    "manufacturer" : "LEE",
+    "name" : "1\/4 Minus Green",
+    "number" : "249",
+    "rgb" : {
+      "b" : 0.9607843137254902,
+      "g" : 0.8862745098039215,
+      "r" : 1
+    },
+    "tintShift" : 0.25,
+    "transmission" : 0.81
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.317,
+    "cieY" : 0.321,
+    "id" : "L279",
+    "manufacturer" : "LEE",
+    "name" : "1\/8 Minus Green",
+    "number" : "279",
+    "rgb" : {
+      "b" : 0.9803921568627451,
+      "g" : 0.9450980392156862,
+      "r" : 1
+    },
+    "tintShift" : 0.125,
+    "transmission" : 0.87
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.2957428937480257,
+    "cieY" : 0.4088050652445726,
+    "id" : "L219",
+    "manufacturer" : "LEE",
+    "miredShift" : -45,
+    "name" : "LEE Fluorescent Green",
+    "number" : "219",
+    "rgb" : {
+      "b" : 0.6901960784313725,
+      "g" : 0.9411764705882353,
+      "r" : 0.6039215686274509
+    },
+    "tintShift" : -0.85,
+    "transmission" : 0.52
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.325,
+    "cieY" : 0.415,
+    "id" : "R3304",
+    "manufacturer" : "Rosco",
+    "name" : "Tough Plusgreen (Full)",
+    "number" : "3304",
+    "rgb" : {
+      "b" : 0.611764705882353,
+      "g" : 1,
+      "r" : 0.6980392156862745
+    },
+    "tintShift" : -1,
+    "transmission" : 0.76
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.32,
+    "cieY" : 0.375,
+    "id" : "R3315",
+    "manufacturer" : "Rosco",
+    "name" : "Tough 1\/2 Plusgreen",
+    "number" : "3315",
+    "rgb" : {
+      "b" : 0.7490196078431373,
+      "g" : 1,
+      "r" : 0.807843137254902
+    },
+    "tintShift" : -0.5,
+    "transmission" : 0.82
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.316,
+    "cieY" : 0.352,
+    "id" : "R3316",
+    "manufacturer" : "Rosco",
+    "name" : "Tough 1\/4 Plusgreen",
+    "number" : "3316",
+    "rgb" : {
+      "b" : 0.8627450980392157,
+      "g" : 1,
+      "r" : 0.8941176470588236
+    },
+    "tintShift" : -0.25,
+    "transmission" : 0.88
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.314,
+    "cieY" : 0.34,
+    "id" : "R3317",
+    "manufacturer" : "Rosco",
+    "name" : "Tough 1\/8 Plusgreen",
+    "number" : "3317",
+    "rgb" : {
+      "b" : 0.9254901960784314,
+      "g" : 1,
+      "r" : 0.9450980392156862
+    },
+    "tintShift" : -0.125,
+    "transmission" : 0.91
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.345,
+    "cieY" : 0.268,
+    "id" : "R3308",
+    "manufacturer" : "Rosco",
+    "name" : "Tough Minusgreen (Full)",
+    "number" : "3308",
+    "rgb" : {
+      "b" : 0.8823529411764706,
+      "g" : 0.6627450980392157,
+      "r" : 1
+    },
+    "tintShift" : 1,
+    "transmission" : 0.55
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.33,
+    "cieY" : 0.298,
+    "id" : "R3313",
+    "manufacturer" : "Rosco",
+    "name" : "Tough 1\/2 Minusgreen",
+    "number" : "3313",
+    "rgb" : {
+      "b" : 0.9294117647058824,
+      "g" : 0.788235294117647,
+      "r" : 1
+    },
+    "tintShift" : 0.5,
+    "transmission" : 0.71
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.321,
+    "cieY" : 0.314,
+    "id" : "R3314",
+    "manufacturer" : "Rosco",
+    "name" : "Tough 1\/4 Minusgreen",
+    "number" : "3314",
+    "rgb" : {
+      "b" : 0.9607843137254902,
+      "g" : 0.8862745098039215,
+      "r" : 1
+    },
+    "tintShift" : 0.25,
+    "transmission" : 0.81
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.317,
+    "cieY" : 0.321,
+    "id" : "R3318",
+    "manufacturer" : "Rosco",
+    "name" : "Tough 1\/8 Minusgreen",
+    "number" : "3318",
+    "rgb" : {
+      "b" : 0.9803921568627451,
+      "g" : 0.9450980392156862,
+      "r" : 1
+    },
+    "tintShift" : 0.125,
+    "transmission" : 0.88
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.36684420339576,
+    "cieY" : 0.2805059724819904,
+    "id" : "R3306",
+    "manufacturer" : "Rosco",
+    "miredShift" : 60,
+    "name" : "Tough Fluorofilter",
+    "number" : "3306",
+    "rgb" : {
+      "b" : 0.7843137254901961,
+      "g" : 0.6,
+      "r" : 1
+    },
+    "tintShift" : 0.9,
+    "transmission" : 0.46
+  },
+  {
+    "category" : "plusMinusGreen",
+    "cieX" : 0.3638581680417782,
+    "cieY" : 0.28359269099174766,
+    "id" : "R3310",
+    "manufacturer" : "Rosco",
+    "miredShift" : 55,
+    "name" : "Fluorofilter",
+    "number" : "3310",
+    "rgb" : {
+      "b" : 0.792156862745098,
+      "g" : 0.6196078431372549,
+      "r" : 1
+    },
+    "tintShift" : 0.85,
+    "transmission" : 0.48
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.3586951002086803,
+    "cieY" : 0.3852055210493726,
+    "id" : "L212",
+    "manufacturer" : "LEE",
+    "miredShift" : 28,
+    "name" : "L.C.T. Yellow (Y1)",
+    "number" : "212",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.9411764705882353,
+      "r" : 1
+    },
+    "transmission" : 0.85
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.30443902820184887,
+    "cieY" : 0.36281108381817445,
+    "id" : "L213",
+    "manufacturer" : "LEE",
+    "name" : "White Flame Green",
+    "number" : "213",
+    "rgb" : {
+      "b" : 0.8745098039215686,
+      "g" : 1,
+      "r" : 0.8313725490196079
+    },
+    "tintShift" : -0.35,
+    "transmission" : 0.8
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.3813435826243273,
+    "cieY" : 0.3953255397428005,
+    "id" : "L230",
+    "manufacturer" : "LEE",
+    "miredShift" : 55,
+    "name" : "Super Correction L.C.T. Yellow",
+    "number" : "230",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.8745098039215686,
+      "r" : 1
+    },
+    "transmission" : 0.72
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.4121950579097152,
+    "cieY" : 0.37511272071431007,
+    "id" : "L232",
+    "manufacturer" : "LEE",
+    "miredShift" : 95,
+    "name" : "Super Correction W.F. Green",
+    "number" : "232",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.7215686274509804,
+      "r" : 1
+    },
+    "tintShift" : 0.35,
+    "transmission" : 0.49
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.45284796149108103,
+    "cieY" : 0.4017108220067,
+    "id" : "L236",
+    "manufacturer" : "LEE",
+    "miredShift" : 115,
+    "name" : "H.M.I. (to Tungsten)",
+    "number" : "236",
+    "rgb" : {
+      "b" : 0.38823529411764707,
+      "g" : 0.6745098039215687,
+      "r" : 1
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.4450416127564184,
+    "cieY" : 0.3823026515285963,
+    "id" : "L237",
+    "manufacturer" : "LEE",
+    "miredShift" : 110,
+    "name" : "C.I.D. (to Tungsten)",
+    "number" : "237",
+    "rgb" : {
+      "b" : 0.4470588235294118,
+      "g" : 0.6509803921568628,
+      "r" : 1
+    },
+    "tintShift" : 0.25,
+    "transmission" : 0.49
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.4246509900110805,
+    "cieY" : 0.369895483294119,
+    "id" : "L238",
+    "manufacturer" : "LEE",
+    "miredShift" : 80,
+    "name" : "C.S.I. (to Tungsten)",
+    "number" : "238",
+    "rgb" : {
+      "b" : 0.5215686274509804,
+      "g" : 0.6745098039215687,
+      "r" : 1
+    },
+    "tintShift" : 0.3,
+    "transmission" : 0.56
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.25076663015544165,
+    "cieY" : 0.27628657484197355,
+    "id" : "L241",
+    "manufacturer" : "LEE",
+    "miredShift" : -95,
+    "name" : "LEE Fluorescent 5700K",
+    "number" : "241",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8235294117647058,
+      "r" : 0.611764705882353
+    },
+    "tintShift" : 0.45,
+    "transmission" : 0.45
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.26669383234506,
+    "cieY" : 0.28762476533323,
+    "id" : "L242",
+    "manufacturer" : "LEE",
+    "miredShift" : -55,
+    "name" : "LEE Fluorescent 4300K",
+    "number" : "242",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8549019607843137,
+      "r" : 0.7137254901960784
+    },
+    "tintShift" : 0.45,
+    "transmission" : 0.52
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.2870779177030611,
+    "cieY" : 0.30067024081032545,
+    "id" : "L243",
+    "manufacturer" : "LEE",
+    "miredShift" : -25,
+    "name" : "LEE Fluorescent 3600K",
+    "number" : "243",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8941176470588236,
+      "r" : 0.8392156862745098
+    },
+    "tintShift" : 0.45,
+    "transmission" : 0.6
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.44185986383038905,
+    "cieY" : 0.41076464327678797,
+    "id" : "L650",
+    "manufacturer" : "LEE",
+    "miredShift" : 120,
+    "name" : "Industry Sodium",
+    "number" : "650",
+    "rgb" : {
+      "b" : 0.4,
+      "g" : 0.7215686274509804,
+      "r" : 1
+    },
+    "tintShift" : -0.15,
+    "transmission" : 0.42
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.4715624703027733,
+    "cieY" : 0.40746824361586814,
+    "id" : "L651",
+    "manufacturer" : "LEE",
+    "miredShift" : 145,
+    "name" : "HI Sodium",
+    "number" : "651",
+    "rgb" : {
+      "b" : 0.3215686274509804,
+      "g" : 0.6431372549019608,
+      "r" : 1
+    },
+    "tintShift" : 0.1,
+    "transmission" : 0.38
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.5092061863985925,
+    "cieY" : 0.39952136148272527,
+    "id" : "L652",
+    "manufacturer" : "LEE",
+    "miredShift" : 185,
+    "name" : "Urban Sodium",
+    "number" : "652",
+    "rgb" : {
+      "b" : 0.23137254901960785,
+      "g" : 0.5490196078431373,
+      "r" : 1
+    },
+    "tintShift" : 0.15,
+    "transmission" : 0.32
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.5139514628738746,
+    "cieY" : 0.4300973821522034,
+    "id" : "L653",
+    "manufacturer" : "LEE",
+    "miredShift" : 240,
+    "name" : "LO Sodium",
+    "number" : "653",
+    "rgb" : {
+      "b" : 0,
+      "g" : 0.6,
+      "r" : 1
+    },
+    "tintShift" : -0.2,
+    "transmission" : 0.22
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.37137200301782175,
+    "cieY" : 0.3581763178276101,
+    "id" : "R01",
+    "manufacturer" : "Rosco",
+    "name" : "Light Bastard Amber",
+    "number" : "01",
+    "rgb" : {
+      "b" : 0.7019607843137254,
+      "g" : 0.8117647058823529,
+      "r" : 1
+    },
+    "transmission" : 0.85
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.39065586045730555,
+    "cieY" : 0.3718942409165175,
+    "id" : "R02",
+    "manufacturer" : "Rosco",
+    "name" : "Bastard Amber",
+    "number" : "02",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.7803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4196694763320191,
+    "cieY" : 0.37909131044496347,
+    "id" : "R03",
+    "manufacturer" : "Rosco",
+    "name" : "Dark Bastard Amber",
+    "number" : "03",
+    "rgb" : {
+      "b" : 0.5215686274509804,
+      "g" : 0.7098039215686275,
+      "r" : 1
+    },
+    "transmission" : 0.7
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.40052320080220977,
+    "cieY" : 0.3720321286470908,
+    "id" : "R04",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Bastard Amber",
+    "number" : "04",
+    "rgb" : {
+      "b" : 0.5882352941176471,
+      "g" : 0.7490196078431373,
+      "r" : 1
+    },
+    "transmission" : 0.74
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3390048285171034,
+    "cieY" : 0.32304533211762365,
+    "id" : "R05",
+    "manufacturer" : "Rosco",
+    "name" : "Rose Tint",
+    "number" : "05",
+    "rgb" : {
+      "b" : 0.8627450980392157,
+      "g" : 0.8392156862745098,
+      "r" : 1
+    },
+    "transmission" : 0.83
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3392607774909809,
+    "cieY" : 0.3645382368065899,
+    "id" : "R06",
+    "manufacturer" : "Rosco",
+    "name" : "No Color Straw",
+    "number" : "06",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.9725490196078431,
+      "r" : 1
+    },
+    "transmission" : 0.9
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.36270823911388145,
+    "cieY" : 0.3968727070490201,
+    "id" : "R07",
+    "manufacturer" : "Rosco",
+    "name" : "Pale Yellow",
+    "number" : "07",
+    "rgb" : {
+      "b" : 0.6901960784313725,
+      "g" : 0.9568627450980393,
+      "r" : 1
+    },
+    "transmission" : 0.88
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3744582406966979,
+    "cieY" : 0.3911050890164687,
+    "id" : "R08",
+    "manufacturer" : "Rosco",
+    "name" : "Pale Gold",
+    "number" : "08",
+    "rgb" : {
+      "b" : 0.6509803921568628,
+      "g" : 0.8901960784313725,
+      "r" : 1
+    },
+    "transmission" : 0.83
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.39847057859547347,
+    "cieY" : 0.40262249994335914,
+    "id" : "R09",
+    "manufacturer" : "Rosco",
+    "name" : "Pale Amber Gold",
+    "number" : "09",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.8313725490196079,
+      "r" : 1
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4258970432261152,
+    "cieY" : 0.4793550698183209,
+    "id" : "R10",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Yellow",
+    "number" : "10",
+    "rgb" : {
+      "b" : 0.23137254901960785,
+      "g" : 0.9176470588235294,
+      "r" : 1
+    },
+    "transmission" : 0.85
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3979587011861141,
+    "cieY" : 0.4400600171967347,
+    "id" : "R11",
+    "manufacturer" : "Rosco",
+    "name" : "Light Straw",
+    "number" : "11",
+    "rgb" : {
+      "b" : 0.47843137254901963,
+      "g" : 0.9254901960784314,
+      "r" : 1
+    },
+    "transmission" : 0.86
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.42473484593650085,
+    "cieY" : 0.46526962069531214,
+    "id" : "R12",
+    "manufacturer" : "Rosco",
+    "name" : "Straw",
+    "number" : "12",
+    "rgb" : {
+      "b" : 0.30196078431372547,
+      "g" : 0.8901960784313725,
+      "r" : 1
+    },
+    "transmission" : 0.82
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.37146874508051514,
+    "cieY" : 0.39379117840130945,
+    "id" : "R13",
+    "manufacturer" : "Rosco",
+    "name" : "Straw Tint",
+    "number" : "13",
+    "rgb" : {
+      "b" : 0.6588235294117647,
+      "g" : 0.9098039215686274,
+      "r" : 1
+    },
+    "transmission" : 0.81
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4266143065879467,
+    "cieY" : 0.4520697728178511,
+    "id" : "R14",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Straw",
+    "number" : "14",
+    "rgb" : {
+      "b" : 0.3411764705882353,
+      "g" : 0.8549019607843137,
+      "r" : 1
+    },
+    "transmission" : 0.76
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.46055210283158077,
+    "cieY" : 0.4644517138003444,
+    "id" : "R15",
+    "manufacturer" : "Rosco",
+    "name" : "Deep Straw",
+    "number" : "15",
+    "rgb" : {
+      "b" : 0.12156862745098039,
+      "g" : 0.7843137254901961,
+      "r" : 1
+    },
+    "transmission" : 0.67
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.431518667634153,
+    "cieY" : 0.4159512122717565,
+    "id" : "R16",
+    "manufacturer" : "Rosco",
+    "name" : "Light Amber",
+    "number" : "16",
+    "rgb" : {
+      "b" : 0.4196078431372549,
+      "g" : 0.7607843137254902,
+      "r" : 1
+    },
+    "transmission" : 0.73
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.44496619386458447,
+    "cieY" : 0.39103903941719204,
+    "id" : "R17",
+    "manufacturer" : "Rosco",
+    "name" : "Light Flame",
+    "number" : "17",
+    "rgb" : {
+      "b" : 0.43137254901960786,
+      "g" : 0.6705882352941176,
+      "r" : 1
+    },
+    "transmission" : 0.58
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4778960830098076,
+    "cieY" : 0.3971670076048602,
+    "id" : "R18",
+    "manufacturer" : "Rosco",
+    "name" : "Flame",
+    "number" : "18",
+    "rgb" : {
+      "b" : 0.32941176470588235,
+      "g" : 0.6078431372549019,
+      "r" : 1
+    },
+    "transmission" : 0.5
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5863821696960713,
+    "cieY" : 0.3611179631664096,
+    "id" : "R19",
+    "manufacturer" : "Rosco",
+    "name" : "Fire",
+    "number" : "19",
+    "rgb" : {
+      "b" : 0.10588235294117647,
+      "g" : 0.3215686274509804,
+      "r" : 1
+    },
+    "transmission" : 0.23
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4902533941719811,
+    "cieY" : 0.429675281610603,
+    "id" : "R20",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Amber",
+    "number" : "20",
+    "rgb" : {
+      "b" : 0.1803921568627451,
+      "g" : 0.6470588235294118,
+      "r" : 1
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5352553582047098,
+    "cieY" : 0.4080046900140976,
+    "id" : "R21",
+    "manufacturer" : "Rosco",
+    "name" : "Golden Amber",
+    "number" : "21",
+    "rgb" : {
+      "b" : 0.07058823529411765,
+      "g" : 0.5176470588235295,
+      "r" : 1
+    },
+    "transmission" : 0.43
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5790160894605169,
+    "cieY" : 0.37435153177657543,
+    "id" : "R22",
+    "manufacturer" : "Rosco",
+    "name" : "Deep Amber",
+    "number" : "22",
+    "rgb" : {
+      "b" : 0.050980392156862744,
+      "g" : 0.3686274509803922,
+      "r" : 1
+    },
+    "transmission" : 0.28
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5598184119386171,
+    "cieY" : 0.3908129048223918,
+    "id" : "R23",
+    "manufacturer" : "Rosco",
+    "name" : "Orange",
+    "number" : "23",
+    "rgb" : {
+      "b" : 0.0392156862745098,
+      "g" : 0.4392156862745098,
+      "r" : 1
+    },
+    "transmission" : 0.32
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6029290418538392,
+    "cieY" : 0.33981574425999045,
+    "id" : "R24",
+    "manufacturer" : "Rosco",
+    "name" : "Scarlet",
+    "number" : "24",
+    "rgb" : {
+      "b" : 0.1411764705882353,
+      "g" : 0.2196078431372549,
+      "r" : 1
+    },
+    "transmission" : 0.19
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6074883062204656,
+    "cieY" : 0.34798973272496686,
+    "id" : "R25",
+    "manufacturer" : "Rosco",
+    "name" : "Orange Red",
+    "number" : "25",
+    "rgb" : {
+      "b" : 0.0784313725490196,
+      "g" : 0.23921568627450981,
+      "r" : 1
+    },
+    "transmission" : 0.16
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6128593897828503,
+    "cieY" : 0.32350060534963737,
+    "id" : "R26",
+    "manufacturer" : "Rosco",
+    "name" : "Light Red",
+    "number" : "26",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.09803921568627451,
+      "r" : 0.9607843137254902
+    },
+    "transmission" : 0.12
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6204958135561885,
+    "cieY" : 0.32224215374277765,
+    "id" : "R27",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Red",
+    "number" : "27",
+    "rgb" : {
+      "b" : 0.11764705882352941,
+      "g" : 0.03137254901960784,
+      "r" : 0.8313725490196079
+    },
+    "transmission" : 0.06
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4181946034384198,
+    "cieY" : 0.3482213926865021,
+    "id" : "R30",
+    "manufacturer" : "Rosco",
+    "name" : "Light Salmon Pink",
+    "number" : "30",
+    "rgb" : {
+      "b" : 0.5686274509803921,
+      "g" : 0.6392156862745098,
+      "r" : 1
+    },
+    "transmission" : 0.64
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.43816686759593354,
+    "cieY" : 0.3449453010664347,
+    "id" : "R31",
+    "manufacturer" : "Rosco",
+    "name" : "Salmon Pink",
+    "number" : "31",
+    "rgb" : {
+      "b" : 0.5215686274509804,
+      "g" : 0.5803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.48292313624096495,
+    "cieY" : 0.3363261437809913,
+    "id" : "R32",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Salmon Pink",
+    "number" : "32",
+    "rgb" : {
+      "b" : 0.43137254901960786,
+      "g" : 0.4588235294117647,
+      "r" : 1
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.33783345330522374,
+    "cieY" : 0.31900839936363123,
+    "id" : "R33",
+    "manufacturer" : "Rosco",
+    "name" : "No Color Pink",
+    "number" : "33",
+    "rgb" : {
+      "b" : 0.8705882352941177,
+      "g" : 0.8313725490196079,
+      "r" : 1
+    },
+    "transmission" : 0.8
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3753433805385457,
+    "cieY" : 0.30616449175516736,
+    "id" : "R34",
+    "manufacturer" : "Rosco",
+    "name" : "Flesh Pink",
+    "number" : "34",
+    "rgb" : {
+      "b" : 0.7372549019607844,
+      "g" : 0.6509803921568628,
+      "r" : 1
+    },
+    "transmission" : 0.58
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3541774192252811,
+    "cieY" : 0.3053856384887783,
+    "id" : "R35",
+    "manufacturer" : "Rosco",
+    "name" : "Light Pink",
+    "number" : "35",
+    "rgb" : {
+      "b" : 0.8117647058823529,
+      "g" : 0.7215686274509804,
+      "r" : 1
+    },
+    "transmission" : 0.69
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3909962914419064,
+    "cieY" : 0.2916849994786054,
+    "id" : "R36",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Pink",
+    "number" : "36",
+    "rgb" : {
+      "b" : 0.7019607843137254,
+      "g" : 0.5607843137254902,
+      "r" : 1
+    },
+    "transmission" : 0.5
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3496227940786756,
+    "cieY" : 0.3023932782205152,
+    "id" : "R37",
+    "manufacturer" : "Rosco",
+    "name" : "Pale Rose Pink",
+    "number" : "37",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.7294117647058823,
+      "r" : 1
+    },
+    "transmission" : 0.64
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.36343866159322497,
+    "cieY" : 0.3021184994299499,
+    "id" : "R38",
+    "manufacturer" : "Rosco",
+    "name" : "Light Rose",
+    "number" : "38",
+    "rgb" : {
+      "b" : 0.7803921568627451,
+      "g" : 0.6784313725490196,
+      "r" : 1
+    },
+    "transmission" : 0.62
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4368308360858498,
+    "cieY" : 0.23166532938888218,
+    "id" : "R39",
+    "manufacturer" : "Rosco",
+    "name" : "Skelton Exotic Sangria",
+    "number" : "39",
+    "rgb" : {
+      "b" : 0.5411764705882353,
+      "g" : 0.14901960784313725,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.16
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.49193477030550786,
+    "cieY" : 0.36195078028018135,
+    "id" : "R40",
+    "manufacturer" : "Rosco",
+    "name" : "Light Salmon",
+    "number" : "40",
+    "rgb" : {
+      "b" : 0.3686274509803922,
+      "g" : 0.5019607843137255,
+      "r" : 1
+    },
+    "transmission" : 0.44
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5309638074632198,
+    "cieY" : 0.35593838149543916,
+    "id" : "R41",
+    "manufacturer" : "Rosco",
+    "name" : "Salmon",
+    "number" : "41",
+    "rgb" : {
+      "b" : 0.2901960784313726,
+      "g" : 0.4117647058823529,
+      "r" : 1
+    },
+    "transmission" : 0.35
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5729145681786936,
+    "cieY" : 0.3389223126818341,
+    "id" : "R42",
+    "manufacturer" : "Rosco",
+    "name" : "Deep Salmon",
+    "number" : "42",
+    "rgb" : {
+      "b" : 0.2196078431372549,
+      "g" : 0.27058823529411763,
+      "r" : 0.9607843137254902
+    },
+    "transmission" : 0.21
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.46199700301780183,
+    "cieY" : 0.27528813110827693,
+    "id" : "R43",
+    "manufacturer" : "Rosco",
+    "name" : "Deep Pink",
+    "number" : "43",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.3215686274509804,
+      "r" : 1
+    },
+    "transmission" : 0.29
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4257840621074616,
+    "cieY" : 0.26016369594589533,
+    "id" : "R44",
+    "manufacturer" : "Rosco",
+    "name" : "Middle Rose",
+    "number" : "44",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.34901960784313724,
+      "r" : 0.9686274509803922
+    },
+    "transmission" : 0.3
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.48878680581516865,
+    "cieY" : 0.263288915760587,
+    "id" : "R45",
+    "manufacturer" : "Rosco",
+    "name" : "Rose",
+    "number" : "45",
+    "rgb" : {
+      "b" : 0.45098039215686275,
+      "g" : 0.1607843137254902,
+      "r" : 0.8901960784313725
+    },
+    "transmission" : 0.16
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4629044568398937,
+    "cieY" : 0.24032619253959572,
+    "id" : "R46",
+    "manufacturer" : "Rosco",
+    "name" : "Magenta",
+    "number" : "46",
+    "rgb" : {
+      "b" : 0.47843137254901963,
+      "g" : 0.09803921568627451,
+      "r" : 0.8313725490196079
+    },
+    "transmission" : 0.12
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.34849020688311033,
+    "cieY" : 0.2316951138050723,
+    "id" : "R47",
+    "manufacturer" : "Rosco",
+    "name" : "Light Rose Purple",
+    "number" : "47",
+    "rgb" : {
+      "b" : 0.6705882352941176,
+      "g" : 0.3686274509803922,
+      "r" : 0.7686274509803922
+    },
+    "transmission" : 0.25
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.34076745356637,
+    "cieY" : 0.1976536592136801,
+    "id" : "R48",
+    "manufacturer" : "Rosco",
+    "name" : "Rose Purple",
+    "number" : "48",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.23137254901960785,
+      "r" : 0.6784313725490196
+    },
+    "transmission" : 0.15
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.32519864611949906,
+    "cieY" : 0.17277441716080266,
+    "id" : "R49",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Purple",
+    "number" : "49",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.12941176470588237,
+      "r" : 0.5607843137254902
+    },
+    "transmission" : 0.08
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4125936700744393,
+    "cieY" : 0.23934782474260236,
+    "id" : "R50",
+    "manufacturer" : "Rosco",
+    "name" : "Mauve",
+    "number" : "50",
+    "rgb" : {
+      "b" : 0.4196078431372549,
+      "g" : 0.1803921568627451,
+      "r" : 0.6196078431372549
+    },
+    "transmission" : 0.12
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2822208734977494,
+    "cieY" : 0.22445725787684484,
+    "id" : "R51",
+    "manufacturer" : "Rosco",
+    "name" : "Surprise Pink",
+    "number" : "51",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.6196078431372549,
+      "r" : 0.8313725490196079
+    },
+    "transmission" : 0.45
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2912026197412075,
+    "cieY" : 0.26474608967529156,
+    "id" : "R52",
+    "manufacturer" : "Rosco",
+    "name" : "Light Lavender",
+    "number" : "52",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7607843137254902,
+      "r" : 0.8705882352941177
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2999411123319686,
+    "cieY" : 0.29036004502073914,
+    "id" : "R53",
+    "manufacturer" : "Rosco",
+    "name" : "Pale Lavender",
+    "number" : "53",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8509803921568627,
+      "r" : 0.9176470588235294
+    },
+    "transmission" : 0.72
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.287415758071889,
+    "cieY" : 0.2586460358428122,
+    "id" : "R54",
+    "manufacturer" : "Rosco",
+    "name" : "Special Lavender",
+    "number" : "54",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7411764705882353,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.64
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.26219503441896586,
+    "cieY" : 0.2185497478507812,
+    "id" : "R55",
+    "manufacturer" : "Rosco",
+    "name" : "Lilac",
+    "number" : "55",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.6196078431372549,
+      "r" : 0.7294117647058823
+    },
+    "transmission" : 0.44
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.23202127876166356,
+    "cieY" : 0.14373023427053536,
+    "id" : "R56",
+    "manufacturer" : "Rosco",
+    "name" : "Gypsy Lavender",
+    "number" : "56",
+    "rgb" : {
+      "b" : 0.8901960784313725,
+      "g" : 0.3215686274509804,
+      "r" : 0.5490196078431373
+    },
+    "transmission" : 0.18
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.24391008873808503,
+    "cieY" : 0.17462441309192608,
+    "id" : "R57",
+    "manufacturer" : "Rosco",
+    "name" : "Lavender",
+    "number" : "57",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.47843137254901963,
+      "r" : 0.6588235294117647
+    },
+    "transmission" : 0.32
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2222074579901006,
+    "cieY" : 0.1285716333766777,
+    "id" : "R58",
+    "manufacturer" : "Rosco",
+    "name" : "Deep Lavender",
+    "number" : "58",
+    "rgb" : {
+      "b" : 0.8509803921568627,
+      "g" : 0.25882352941176473,
+      "r" : 0.49019607843137253
+    },
+    "transmission" : 0.13
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.18934236797167878,
+    "cieY" : 0.08903820822795588,
+    "id" : "R59",
+    "manufacturer" : "Rosco",
+    "name" : "Indigo",
+    "number" : "59",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.09019607843137255,
+      "r" : 0.30196078431372547
+    },
+    "transmission" : 0.05
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.28928323442442827,
+    "cieY" : 0.3093022506461852,
+    "id" : "R60",
+    "manufacturer" : "Rosco",
+    "name" : "No Color Blue",
+    "number" : "60",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9254901960784314,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.68
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2829687294248788,
+    "cieY" : 0.3046401000401711,
+    "id" : "R61",
+    "manufacturer" : "Rosco",
+    "name" : "Mist Blue",
+    "number" : "61",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9098039215686274,
+      "r" : 0.8117647058823529
+    },
+    "transmission" : 0.65
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2662314975101512,
+    "cieY" : 0.2887131972916299,
+    "id" : "R62",
+    "manufacturer" : "Rosco",
+    "name" : "Booster Blue",
+    "number" : "62",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8588235294117647,
+      "r" : 0.7098039215686275
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.26893375940273906,
+    "cieY" : 0.29803891343835387,
+    "id" : "R63",
+    "manufacturer" : "Rosco",
+    "name" : "Pale Blue",
+    "number" : "63",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8901960784313725,
+      "r" : 0.7215686274509804
+    },
+    "transmission" : 0.58
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.23303665289484507,
+    "cieY" : 0.2613513400976247,
+    "id" : "R64",
+    "manufacturer" : "Rosco",
+    "name" : "Light Steel Blue",
+    "number" : "64",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7843137254901961,
+      "r" : 0.49019607843137253
+    },
+    "transmission" : 0.36
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21706430243100214,
+    "cieY" : 0.24699318706238335,
+    "id" : "R65",
+    "manufacturer" : "Rosco",
+    "name" : "Daylight Blue",
+    "number" : "65",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7490196078431373,
+      "r" : 0.3607843137254902
+    },
+    "transmission" : 0.3
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.23394826431020158,
+    "cieY" : 0.27645479091867675,
+    "id" : "R66",
+    "manufacturer" : "Rosco",
+    "name" : "Cool Blue",
+    "number" : "66",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8313725490196079,
+      "r" : 0.47058823529411764
+    },
+    "transmission" : 0.44
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21049888828040572,
+    "cieY" : 0.23653744084046727,
+    "id" : "R67",
+    "manufacturer" : "Rosco",
+    "name" : "Light Sky Blue",
+    "number" : "67",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7215686274509804,
+      "r" : 0.30980392156862746
+    },
+    "transmission" : 0.27
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.19129367420798726,
+    "cieY" : 0.19280113445393332,
+    "id" : "R68",
+    "manufacturer" : "Rosco",
+    "name" : "Sky Blue",
+    "number" : "68",
+    "rgb" : {
+      "b" : 0.9607843137254902,
+      "g" : 0.5803921568627451,
+      "r" : 0.16862745098039217
+    },
+    "transmission" : 0.16
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.1880326487901035,
+    "cieY" : 0.18937470416390706,
+    "id" : "R69",
+    "manufacturer" : "Rosco",
+    "name" : "Brilliant Blue",
+    "number" : "69",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.5490196078431373,
+      "r" : 0.10196078431372549
+    },
+    "transmission" : 0.14
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.24205966127816136,
+    "cieY" : 0.31240097419777546,
+    "id" : "R70",
+    "manufacturer" : "Rosco",
+    "name" : "Nile Blue",
+    "number" : "70",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.8705882352941177,
+      "r" : 0.4392156862745098
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21747979605057313,
+    "cieY" : 0.2842018554766479,
+    "id" : "R71",
+    "manufacturer" : "Rosco",
+    "name" : "Sea Blue",
+    "number" : "71",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.6196078431372549,
+      "r" : 0.14901960784313725
+    },
+    "transmission" : 0.18
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2203612984129842,
+    "cieY" : 0.2735435537981467,
+    "id" : "R72",
+    "manufacturer" : "Rosco",
+    "name" : "Azure Blue",
+    "number" : "72",
+    "rgb" : {
+      "b" : 0.8588235294117647,
+      "g" : 0.7098039215686275,
+      "r" : 0.27058823529411763
+    },
+    "transmission" : 0.28
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21971876586507436,
+    "cieY" : 0.3109875366374192,
+    "id" : "R73",
+    "manufacturer" : "Rosco",
+    "name" : "Peacock Blue",
+    "number" : "73",
+    "rgb" : {
+      "b" : 0.6784313725490196,
+      "g" : 0.6392156862745098,
+      "r" : 0
+    },
+    "transmission" : 0.2
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16424062707101164,
+    "cieY" : 0.09579865591649113,
+    "id" : "R74",
+    "manufacturer" : "Rosco",
+    "name" : "Night Blue",
+    "number" : "74",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.23137254901960785,
+      "r" : 0.12156862745098039
+    },
+    "transmission" : 0.05
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.18872426935822545,
+    "cieY" : 0.18706074610536844,
+    "id" : "R75",
+    "manufacturer" : "Rosco",
+    "name" : "Twilight Blue",
+    "number" : "75",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.4196078431372549,
+      "r" : 0.09803921568627451
+    },
+    "transmission" : 0.12
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.20128576323686628,
+    "cieY" : 0.2446287255564332,
+    "id" : "R76",
+    "manufacturer" : "Rosco",
+    "name" : "Light Green Blue",
+    "number" : "76",
+    "rgb" : {
+      "b" : 0.7098039215686275,
+      "g" : 0.5294117647058824,
+      "r" : 0
+    },
+    "transmission" : 0.14
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.19668501731797,
+    "cieY" : 0.22806603984420667,
+    "id" : "R77",
+    "manufacturer" : "Rosco",
+    "name" : "Green Blue",
+    "number" : "77",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.43137254901960786,
+      "r" : 0
+    },
+    "transmission" : 0.1
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.18862601490573863,
+    "cieY" : 0.1584898195697955,
+    "id" : "R78",
+    "manufacturer" : "Rosco",
+    "name" : "Trudy Blue",
+    "number" : "78",
+    "rgb" : {
+      "b" : 0.8509803921568627,
+      "g" : 0.4196078431372549,
+      "r" : 0.23137254901960785
+    },
+    "transmission" : 0.14
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16906958533682295,
+    "cieY" : 0.12440165650694712,
+    "id" : "R79",
+    "manufacturer" : "Rosco",
+    "name" : "Bright Blue",
+    "number" : "79",
+    "rgb" : {
+      "b" : 0.9019607843137255,
+      "g" : 0.3607843137254902,
+      "r" : 0.058823529411764705
+    },
+    "transmission" : 0.08
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16315568179625325,
+    "cieY" : 0.10421523139526906,
+    "id" : "R80",
+    "manufacturer" : "Rosco",
+    "name" : "Primary Blue",
+    "number" : "80",
+    "rgb" : {
+      "b" : 0.8588235294117647,
+      "g" : 0.2784313725490196,
+      "r" : 0.0392156862745098
+    },
+    "transmission" : 0.07
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.17725696369533622,
+    "cieY" : 0.14051385543281847,
+    "id" : "R81",
+    "manufacturer" : "Rosco",
+    "name" : "Urban Blue",
+    "number" : "81",
+    "rgb" : {
+      "b" : 0.788235294117647,
+      "g" : 0.34901960784313724,
+      "r" : 0.12941176470588237
+    },
+    "transmission" : 0.09
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.17856094505252956,
+    "cieY" : 0.12090510079114783,
+    "id" : "R82",
+    "manufacturer" : "Rosco",
+    "name" : "Surprise Blue",
+    "number" : "82",
+    "rgb" : {
+      "b" : 0.7686274509803922,
+      "g" : 0.2784313725490196,
+      "r" : 0.2
+    },
+    "transmission" : 0.07
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.159865413210797,
+    "cieY" : 0.09170384887533731,
+    "id" : "R83",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Blue",
+    "number" : "83",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.18823529411764706,
+      "r" : 0.03137254901960784
+    },
+    "transmission" : 0.04
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.20696194792093608,
+    "cieY" : 0.18838912624262527,
+    "id" : "R84",
+    "manufacturer" : "Rosco",
+    "name" : "Zephyr Blue",
+    "number" : "84",
+    "rgb" : {
+      "b" : 0.8901960784313725,
+      "g" : 0.5098039215686274,
+      "r" : 0.34901960784313724
+    },
+    "transmission" : 0.21
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.15817050754206152,
+    "cieY" : 0.08638714320842374,
+    "id" : "R85",
+    "manufacturer" : "Rosco",
+    "name" : "Deep Blue",
+    "number" : "85",
+    "rgb" : {
+      "b" : 0.6509803921568628,
+      "g" : 0.14901960784313725,
+      "r" : 0.0196078431372549
+    },
+    "transmission" : 0.03
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.34897603946408373,
+    "cieY" : 0.5107220008720075,
+    "id" : "R86",
+    "manufacturer" : "Rosco",
+    "name" : "Pea Green",
+    "number" : "86",
+    "rgb" : {
+      "b" : 0.3215686274509804,
+      "g" : 0.9215686274509803,
+      "r" : 0.6392156862745098
+    },
+    "transmission" : 0.6
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3413174807731326,
+    "cieY" : 0.4171071375580841,
+    "id" : "R87",
+    "manufacturer" : "Rosco",
+    "name" : "Pale Yellow Green",
+    "number" : "87",
+    "rgb" : {
+      "b" : 0.6509803921568628,
+      "g" : 0.9686274509803922,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.33565213244462555,
+    "cieY" : 0.45665025672954995,
+    "id" : "R88",
+    "manufacturer" : "Rosco",
+    "name" : "Light Green",
+    "number" : "88",
+    "rgb" : {
+      "b" : 0.5098039215686274,
+      "g" : 0.9215686274509803,
+      "r" : 0.6901960784313725
+    },
+    "transmission" : 0.66
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.30197525479535386,
+    "cieY" : 0.4948734289205098,
+    "id" : "R89",
+    "manufacturer" : "Rosco",
+    "name" : "Moss Green",
+    "number" : "89",
+    "rgb" : {
+      "b" : 0.3686274509803922,
+      "g" : 0.7686274509803922,
+      "r" : 0.34901960784313724
+    },
+    "transmission" : 0.38
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2915940323479577,
+    "cieY" : 0.5452493836435715,
+    "id" : "R90",
+    "manufacturer" : "Rosco",
+    "name" : "Dark Yellow Green",
+    "number" : "90",
+    "rgb" : {
+      "b" : 0.2196078431372549,
+      "g" : 0.6509803921568628,
+      "r" : 0.11764705882352941
+    },
+    "transmission" : 0.15
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.28949017081496214,
+    "cieY" : 0.5529574262647498,
+    "id" : "R91",
+    "manufacturer" : "Rosco",
+    "name" : "Primary Green",
+    "number" : "91",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.5294117647058824,
+      "r" : 0.0392156862745098
+    },
+    "transmission" : 0.09
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.24325204802524103,
+    "cieY" : 0.35811553196297025,
+    "id" : "R92",
+    "manufacturer" : "Rosco",
+    "name" : "Turquoise",
+    "number" : "92",
+    "rgb" : {
+      "b" : 0.788235294117647,
+      "g" : 0.8705882352941177,
+      "r" : 0.2784313725490196
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.23416991758145844,
+    "cieY" : 0.3556416653709845,
+    "id" : "R93",
+    "manufacturer" : "Rosco",
+    "name" : "Blue Green",
+    "number" : "93",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.6784313725490196,
+      "r" : 0.0784313725490196
+    },
+    "transmission" : 0.26
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.26877268261913767,
+    "cieY" : 0.48131732459632515,
+    "id" : "R94",
+    "manufacturer" : "Rosco",
+    "name" : "Kelly Green",
+    "number" : "94",
+    "rgb" : {
+      "b" : 0.4,
+      "g" : 0.7215686274509804,
+      "r" : 0.058823529411764705
+    },
+    "transmission" : 0.22
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.22857815665449518,
+    "cieY" : 0.3428813442576785,
+    "id" : "R95",
+    "manufacturer" : "Rosco",
+    "name" : "Medium Blue Green",
+    "number" : "95",
+    "rgb" : {
+      "b" : 0.5607843137254902,
+      "g" : 0.5882352941176471,
+      "r" : 0
+    },
+    "transmission" : 0.18
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.37223470346932575,
+    "cieY" : 0.5054148145939915,
+    "id" : "R96",
+    "manufacturer" : "Rosco",
+    "name" : "Lime",
+    "number" : "96",
+    "rgb" : {
+      "b" : 0.29411764705882354,
+      "g" : 0.9490196078431372,
+      "r" : 0.7686274509803922
+    },
+    "transmission" : 0.74
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.39618771068035974,
+    "cieY" : 0.368964113524344,
+    "id" : "R99",
+    "manufacturer" : "Rosco",
+    "name" : "Chocolate",
+    "number" : "99",
+    "rgb" : {
+      "b" : 0.43137254901960786,
+      "g" : 0.5411764705882353,
+      "r" : 0.7215686274509804
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4332567468219134,
+    "cieY" : 0.48328778231343617,
+    "id" : "R312",
+    "manufacturer" : "Rosco",
+    "name" : "Canary",
+    "number" : "312",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.9019607843137255,
+      "r" : 1
+    },
+    "transmission" : 0.84
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.45817210896598026,
+    "cieY" : 0.41519910756821515,
+    "id" : "R316",
+    "manufacturer" : "Rosco",
+    "name" : "Gallo Gold",
+    "number" : "316",
+    "rgb" : {
+      "b" : 0.3411764705882353,
+      "g" : 0.6901960784313725,
+      "r" : 1
+    },
+    "transmission" : 0.62
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4676330494193669,
+    "cieY" : 0.3920912615813758,
+    "id" : "R317",
+    "manufacturer" : "Rosco",
+    "name" : "Apricot",
+    "number" : "317",
+    "rgb" : {
+      "b" : 0.3686274509803922,
+      "g" : 0.6196078431372549,
+      "r" : 1
+    },
+    "transmission" : 0.54
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5106275777804263,
+    "cieY" : 0.38208613913395906,
+    "id" : "R318",
+    "manufacturer" : "Rosco",
+    "name" : "Mayan Sun",
+    "number" : "318",
+    "rgb" : {
+      "b" : 0.2784313725490196,
+      "g" : 0.5098039215686274,
+      "r" : 1
+    },
+    "transmission" : 0.45
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.49206281265676327,
+    "cieY" : 0.4078391057532536,
+    "id" : "R321",
+    "manufacturer" : "Rosco",
+    "name" : "Soft Golden Amber",
+    "number" : "321",
+    "rgb" : {
+      "b" : 0.25882352941176473,
+      "g" : 0.6,
+      "r" : 1
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4967724534699927,
+    "cieY" : 0.28554158825510484,
+    "id" : "R332",
+    "manufacturer" : "Rosco",
+    "name" : "Cherry Rose",
+    "number" : "332",
+    "rgb" : {
+      "b" : 0.47058823529411764,
+      "g" : 0.27058823529411763,
+      "r" : 1
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.45146276200494,
+    "cieY" : 0.2650756860223773,
+    "id" : "R342",
+    "manufacturer" : "Rosco",
+    "name" : "Rose Pink",
+    "number" : "342",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.30980392156862746,
+      "r" : 1
+    },
+    "transmission" : 0.26
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2280913600077028,
+    "cieY" : 0.11967741568713645,
+    "id" : "R358",
+    "manufacturer" : "Rosco",
+    "name" : "Rose Indigo",
+    "number" : "358",
+    "rgb" : {
+      "b" : 0.6588235294117647,
+      "g" : 0.1411764705882353,
+      "r" : 0.4
+    },
+    "transmission" : 0.07
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2409190321158437,
+    "cieY" : 0.24899394314394488,
+    "id" : "R364",
+    "manufacturer" : "Rosco",
+    "name" : "Blue Bell",
+    "number" : "364",
+    "rgb" : {
+      "b" : 0.9490196078431372,
+      "g" : 0.7019607843137254,
+      "r" : 0.5411764705882353
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21639796883662366,
+    "cieY" : 0.29340072079221213,
+    "id" : "R370",
+    "manufacturer" : "Rosco",
+    "name" : "Italian Blue",
+    "number" : "370",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.8196078431372549,
+      "r" : 0.10196078431372549
+    },
+    "transmission" : 0.35
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.18135258865988702,
+    "cieY" : 0.08185568610295059,
+    "id" : "R382",
+    "manufacturer" : "Rosco",
+    "name" : "Congo Blue",
+    "number" : "382",
+    "rgb" : {
+      "b" : 0.5098039215686274,
+      "g" : 0.03137254901960784,
+      "r" : 0.1803921568627451
+    },
+    "transmission" : 0.01
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16505562925705486,
+    "cieY" : 0.09018333891094918,
+    "id" : "R385",
+    "manufacturer" : "Rosco",
+    "name" : "Royal Blue",
+    "number" : "385",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.1411764705882353,
+      "r" : 0.10588235294117647
+    },
+    "transmission" : 0.03
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.29755828266586737,
+    "cieY" : 0.5683150512255741,
+    "id" : "R389",
+    "manufacturer" : "Rosco",
+    "name" : "Chroma Green",
+    "number" : "389",
+    "rgb" : {
+      "b" : 0.2196078431372549,
+      "g" : 0.8705882352941177,
+      "r" : 0.1607843137254902
+    },
+    "transmission" : 0.38
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.6195330415536325,
+    "cieY" : 0.3242807610048343,
+    "id" : "R2001",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Red",
+    "number" : "2001",
+    "rgb" : {
+      "b" : 0.11764705882352941,
+      "g" : 0.058823529411764705,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.08
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.5614973690524805,
+    "cieY" : 0.3885194345873964,
+    "id" : "R2002",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Orange",
+    "number" : "2002",
+    "rgb" : {
+      "b" : 0.050980392156862744,
+      "g" : 0.43137254901960786,
+      "r" : 1
+    },
+    "transmission" : 0.32
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.44222445620849915,
+    "cieY" : 0.4816954135839204,
+    "id" : "R2003",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Yellow",
+    "number" : "2003",
+    "rgb" : {
+      "b" : 0.10196078431372549,
+      "g" : 0.8705882352941177,
+      "r" : 1
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.2942140074641842,
+    "cieY" : 0.5607023565758165,
+    "id" : "R2004",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Green",
+    "number" : "2004",
+    "rgb" : {
+      "b" : 0.2196078431372549,
+      "g" : 0.7686274509803922,
+      "r" : 0.12156862745098039
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.21286062914127854,
+    "cieY" : 0.2862982438292307,
+    "id" : "R2005",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Cyan",
+    "number" : "2005",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.7215686274509804,
+      "r" : 0
+    },
+    "transmission" : 0.28
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.181811618552794,
+    "cieY" : 0.16853498758473626,
+    "id" : "R2006",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Azure",
+    "number" : "2006",
+    "rgb" : {
+      "b" : 0.8784313725490196,
+      "g" : 0.47058823529411764,
+      "r" : 0.0784313725490196
+    },
+    "transmission" : 0.16
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.162331180565002,
+    "cieY" : 0.09866357634171438,
+    "id" : "R2007",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Blue",
+    "number" : "2007",
+    "rgb" : {
+      "b" : 0.7490196078431373,
+      "g" : 0.2196078431372549,
+      "r" : 0.050980392156862744
+    },
+    "transmission" : 0.05
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.18260207887027566,
+    "cieY" : 0.08732465925242805,
+    "id" : "R2008",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Indigo",
+    "number" : "2008",
+    "rgb" : {
+      "b" : 0.6509803921568628,
+      "g" : 0.09019607843137255,
+      "r" : 0.23921568627450981
+    },
+    "transmission" : 0.03
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.23044997435990222,
+    "cieY" : 0.11494841544730564,
+    "id" : "R2009",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Violet",
+    "number" : "2009",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.12156862745098039,
+      "r" : 0.45098039215686275
+    },
+    "transmission" : 0.06
+  },
+  {
+    "category" : "storaro",
+    "cieX" : 0.43177701063096696,
+    "cieY" : 0.22302512307914144,
+    "id" : "R2010",
+    "manufacturer" : "Rosco",
+    "name" : "Storaro Magenta",
+    "number" : "2010",
+    "rgb" : {
+      "b" : 0.5215686274509804,
+      "g" : 0.09803921568627451,
+      "r" : 0.8
+    },
+    "transmission" : 0.11
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.280597494159298,
+    "cieY" : 0.295772311449225,
+    "id" : "R4215",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Blue",
+    "number" : "4215",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8784313725490196,
+      "r" : 0.8
+    },
+    "transmission" : 0.68
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.24606231436737566,
+    "cieY" : 0.25630111469411837,
+    "id" : "R4230",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Blue",
+    "number" : "4230",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7607843137254902,
+      "r" : 0.6
+    },
+    "transmission" : 0.48
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.1959685449372719,
+    "cieY" : 0.18020876678045006,
+    "id" : "R4260",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Blue",
+    "number" : "4260",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.5607843137254902,
+      "r" : 0.30196078431372547
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.17045171641732654,
+    "cieY" : 0.1250050662488106,
+    "id" : "R4290",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Blue",
+    "number" : "4290",
+    "rgb" : {
+      "b" : 0.9019607843137255,
+      "g" : 0.3607843137254902,
+      "r" : 0.09803921568627451
+    },
+    "transmission" : 0.11
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.284705915443792,
+    "cieY" : 0.3236683240067079,
+    "id" : "R4315",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Cyan",
+    "number" : "4315",
+    "rgb" : {
+      "b" : 0.9803921568627451,
+      "g" : 0.9607843137254902,
+      "r" : 0.8
+    },
+    "transmission" : 0.74
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.2586038227648572,
+    "cieY" : 0.31726793980995255,
+    "id" : "R4330",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Cyan",
+    "number" : "4330",
+    "rgb" : {
+      "b" : 0.9607843137254902,
+      "g" : 0.9215686274509803,
+      "r" : 0.6
+    },
+    "transmission" : 0.58
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.22328238407633288,
+    "cieY" : 0.3007938256763094,
+    "id" : "R4360",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Cyan",
+    "number" : "4360",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.8392156862745098,
+      "r" : 0.23137254901960785
+    },
+    "transmission" : 0.38
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.21286062914127854,
+    "cieY" : 0.2862982438292307,
+    "id" : "R4390",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Cyan",
+    "number" : "4390",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.7215686274509804,
+      "r" : 0
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.31092079719055454,
+    "cieY" : 0.3674727089798855,
+    "id" : "R4415",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Green",
+    "number" : "4415",
+    "rgb" : {
+      "b" : 0.8392156862745098,
+      "g" : 0.9803921568627451,
+      "r" : 0.8392156862745098
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.30859600483932054,
+    "cieY" : 0.4169725863687504,
+    "id" : "R4430",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Green",
+    "number" : "4430",
+    "rgb" : {
+      "b" : 0.6588235294117647,
+      "g" : 0.9411764705882353,
+      "r" : 0.6588235294117647
+    },
+    "transmission" : 0.62
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.3036128072385187,
+    "cieY" : 0.5230756841844537,
+    "id" : "R4460",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Green",
+    "number" : "4460",
+    "rgb" : {
+      "b" : 0.3411764705882353,
+      "g" : 0.8588235294117647,
+      "r" : 0.3411764705882353
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.2983543101573443,
+    "cieY" : 0.5723345430451637,
+    "id" : "R4490",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Green",
+    "number" : "4490",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.7215686274509804,
+      "r" : 0.12156862745098039
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.343885619257235,
+    "cieY" : 0.37443139148053434,
+    "id" : "R4515",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Yellow",
+    "number" : "4515",
+    "rgb" : {
+      "b" : 0.8,
+      "g" : 0.9803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.9
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.3774885263904067,
+    "cieY" : 0.4173881588761604,
+    "id" : "R4530",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Yellow",
+    "number" : "4530",
+    "rgb" : {
+      "b" : 0.6,
+      "g" : 0.9490196078431372,
+      "r" : 1
+    },
+    "transmission" : 0.86
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.42268265084823825,
+    "cieY" : 0.4674862673236487,
+    "id" : "R4560",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Yellow",
+    "number" : "4560",
+    "rgb" : {
+      "b" : 0.30196078431372547,
+      "g" : 0.9019607843137255,
+      "r" : 1
+    },
+    "transmission" : 0.82
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.44655059087619986,
+    "cieY" : 0.4784249944409246,
+    "id" : "R4590",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Yellow",
+    "number" : "4590",
+    "rgb" : {
+      "b" : 0.09803921568627451,
+      "g" : 0.8509803921568627,
+      "r" : 1
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.3526968279951261,
+    "cieY" : 0.32914246413178666,
+    "id" : "R4615",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Red",
+    "number" : "4615",
+    "rgb" : {
+      "b" : 0.8,
+      "g" : 0.8,
+      "r" : 1
+    },
+    "transmission" : 0.68
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.41485548936533573,
+    "cieY" : 0.3293280086870565,
+    "id" : "R4630",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Red",
+    "number" : "4630",
+    "rgb" : {
+      "b" : 0.6,
+      "g" : 0.6,
+      "r" : 1
+    },
+    "transmission" : 0.46
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.5502169606904482,
+    "cieY" : 0.3297320647501059,
+    "id" : "R4660",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Red",
+    "number" : "4660",
+    "rgb" : {
+      "b" : 0.30196078431372547,
+      "g" : 0.30196078431372547,
+      "r" : 1
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.6218665118576663,
+    "cieY" : 0.32994593975663833,
+    "id" : "R4690",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Red",
+    "number" : "4690",
+    "rgb" : {
+      "b" : 0.09803921568627451,
+      "g" : 0.09803921568627451,
+      "r" : 0.9019607843137255
+    },
+    "transmission" : 0.13
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.3292848386389467,
+    "cieY" : 0.2980558371310071,
+    "id" : "R4715",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Magenta",
+    "number" : "4715",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.8,
+      "r" : 1
+    },
+    "transmission" : 0.7
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.353345027270901,
+    "cieY" : 0.2667788403671776,
+    "id" : "R4730",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Magenta",
+    "number" : "4730",
+    "rgb" : {
+      "b" : 0.8392156862745098,
+      "g" : 0.6,
+      "r" : 1
+    },
+    "transmission" : 0.5
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.3984701511702712,
+    "cieY" : 0.2253974539115894,
+    "id" : "R4760",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Magenta",
+    "number" : "4760",
+    "rgb" : {
+      "b" : 0.7019607843137254,
+      "g" : 0.2784313725490196,
+      "r" : 0.9607843137254902
+    },
+    "transmission" : 0.27
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.4298536323087313,
+    "cieY" : 0.22092003093964857,
+    "id" : "R4790",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Magenta",
+    "number" : "4790",
+    "rgb" : {
+      "b" : 0.5607843137254902,
+      "g" : 0.09803921568627451,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.15
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.3385612939794888,
+    "cieY" : 0.3200120376966279,
+    "id" : "R4815",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Pink",
+    "number" : "4815",
+    "rgb" : {
+      "b" : 0.8666666666666667,
+      "g" : 0.8313725490196079,
+      "r" : 1
+    },
+    "transmission" : 0.74
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.376692644115369,
+    "cieY" : 0.3103377271040669,
+    "id" : "R4830",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Pink",
+    "number" : "4830",
+    "rgb" : {
+      "b" : 0.7294117647058823,
+      "g" : 0.6588235294117647,
+      "r" : 1
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.46944022473267755,
+    "cieY" : 0.2977565586778021,
+    "id" : "R4860",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Pink",
+    "number" : "4860",
+    "rgb" : {
+      "b" : 0.5098039215686274,
+      "g" : 0.3803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.34
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.5514768301979331,
+    "cieY" : 0.2994444613319966,
+    "id" : "R4890",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Pink",
+    "number" : "4890",
+    "rgb" : {
+      "b" : 0.3215686274509804,
+      "g" : 0.1607843137254902,
+      "r" : 0.9215686274509803
+    },
+    "transmission" : 0.2
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.29719600820243947,
+    "cieY" : 0.2868947829653967,
+    "id" : "R4915",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 15 Lavender",
+    "number" : "4915",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8392156862745098,
+      "r" : 0.9019607843137255
+    },
+    "transmission" : 0.7
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.27327590062912643,
+    "cieY" : 0.23802428517991664,
+    "id" : "R4930",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 30 Lavender",
+    "number" : "4930",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.6784313725490196,
+      "r" : 0.7803921568627451
+    },
+    "transmission" : 0.5
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.23101122872783975,
+    "cieY" : 0.1546729225347218,
+    "id" : "R4960",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 60 Lavender",
+    "number" : "4960",
+    "rgb" : {
+      "b" : 0.9607843137254902,
+      "g" : 0.4,
+      "r" : 0.5803921568627451
+    },
+    "transmission" : 0.26
+  },
+  {
+    "category" : "calColor",
+    "cieX" : 0.20382226716348198,
+    "cieY" : 0.11134464633808476,
+    "id" : "R4990",
+    "manufacturer" : "Rosco",
+    "name" : "CalColor 90 Lavender",
+    "number" : "4990",
+    "rgb" : {
+      "b" : 0.8588235294117647,
+      "g" : 0.2196078431372549,
+      "r" : 0.4196078431372549
+    },
+    "transmission" : 0.14
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.43399673978146414,
+    "cieY" : 0.2628411055770783,
+    "id" : "L002",
+    "manufacturer" : "LEE",
+    "name" : "Rose Pink",
+    "number" : "002",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.34901960784313724,
+      "r" : 1
+    },
+    "transmission" : 0.35
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.30194422277443067,
+    "cieY" : 0.29780527108523946,
+    "id" : "L003",
+    "manufacturer" : "LEE",
+    "name" : "Lavender Tint",
+    "number" : "003",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8784313725490196,
+      "r" : 0.9294117647058824
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.39347828568605864,
+    "cieY" : 0.37092714141599076,
+    "id" : "L004",
+    "manufacturer" : "LEE",
+    "name" : "Medium Bastard Amber",
+    "number" : "004",
+    "rgb" : {
+      "b" : 0.611764705882353,
+      "g" : 0.7686274509803922,
+      "r" : 1
+    },
+    "transmission" : 0.73
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.35743089735450523,
+    "cieY" : 0.38983186724202074,
+    "id" : "L007",
+    "manufacturer" : "LEE",
+    "name" : "Pale Yellow",
+    "number" : "007",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.9607843137254902,
+      "r" : 1
+    },
+    "transmission" : 0.89
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.49363166057354946,
+    "cieY" : 0.35333508149861753,
+    "id" : "L008",
+    "manufacturer" : "LEE",
+    "name" : "Dark Salmon",
+    "number" : "008",
+    "rgb" : {
+      "b" : 0.3803921568627451,
+      "g" : 0.47843137254901963,
+      "r" : 1
+    },
+    "transmission" : 0.43
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3927976111009432,
+    "cieY" : 0.3947998983209591,
+    "id" : "L009",
+    "manufacturer" : "LEE",
+    "name" : "Pale Amber Gold",
+    "number" : "009",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.8313725490196079,
+      "r" : 1
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.42948307428038274,
+    "cieY" : 0.4865929341552718,
+    "id" : "L010",
+    "manufacturer" : "LEE",
+    "name" : "Medium Yellow",
+    "number" : "010",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.9215686274509803,
+      "r" : 1
+    },
+    "transmission" : 0.85
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3727906622512079,
+    "cieY" : 0.39578353313362635,
+    "id" : "L013",
+    "manufacturer" : "LEE",
+    "name" : "Straw Tint",
+    "number" : "013",
+    "rgb" : {
+      "b" : 0.6509803921568628,
+      "g" : 0.9098039215686274,
+      "r" : 1
+    },
+    "transmission" : 0.8
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4624174615108233,
+    "cieY" : 0.4648985441549296,
+    "id" : "L015",
+    "manufacturer" : "LEE",
+    "name" : "Deep Straw",
+    "number" : "015",
+    "rgb" : {
+      "b" : 0.10196078431372549,
+      "g" : 0.7803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.66
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.44956204236252073,
+    "cieY" : 0.37319768725245045,
+    "id" : "L017",
+    "manufacturer" : "LEE",
+    "name" : "Surprise Peach",
+    "number" : "017",
+    "rgb" : {
+      "b" : 0.45098039215686275,
+      "g" : 0.6196078431372549,
+      "r" : 1
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.59148022434848,
+    "cieY" : 0.3575420440662867,
+    "id" : "L019",
+    "manufacturer" : "LEE",
+    "name" : "Fire",
+    "number" : "019",
+    "rgb" : {
+      "b" : 0.10196078431372549,
+      "g" : 0.30196078431372547,
+      "r" : 1
+    },
+    "transmission" : 0.21
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4942044261521309,
+    "cieY" : 0.429907068333372,
+    "id" : "L020",
+    "manufacturer" : "LEE",
+    "name" : "Medium Amber",
+    "number" : "020",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.6392156862745098,
+      "r" : 1
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5393575047418022,
+    "cieY" : 0.4038281589501088,
+    "id" : "L021",
+    "manufacturer" : "LEE",
+    "name" : "Gold Amber",
+    "number" : "021",
+    "rgb" : {
+      "b" : 0.0784313725490196,
+      "g" : 0.5019607843137255,
+      "r" : 1
+    },
+    "transmission" : 0.4
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5790160894605169,
+    "cieY" : 0.37435153177657543,
+    "id" : "L022",
+    "manufacturer" : "LEE",
+    "name" : "Dark Amber",
+    "number" : "022",
+    "rgb" : {
+      "b" : 0.050980392156862744,
+      "g" : 0.3686274509803922,
+      "r" : 1
+    },
+    "transmission" : 0.26
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5974240148189541,
+    "cieY" : 0.33950271823645556,
+    "id" : "L024",
+    "manufacturer" : "LEE",
+    "name" : "Scarlet",
+    "number" : "024",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.23137254901960785,
+      "r" : 1
+    },
+    "transmission" : 0.2
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5753417773490317,
+    "cieY" : 0.3534997314567289,
+    "id" : "L025",
+    "manufacturer" : "LEE",
+    "name" : "Sunset Red",
+    "number" : "025",
+    "rgb" : {
+      "b" : 0.1803921568627451,
+      "g" : 0.3215686274509804,
+      "r" : 1
+    },
+    "transmission" : 0.25
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6172094781051175,
+    "cieY" : 0.3232901608358626,
+    "id" : "L026",
+    "manufacturer" : "LEE",
+    "name" : "Bright Red",
+    "number" : "026",
+    "rgb" : {
+      "b" : 0.1411764705882353,
+      "g" : 0.07058823529411765,
+      "r" : 0.9215686274509803
+    },
+    "transmission" : 0.09
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6228287708959513,
+    "cieY" : 0.3239237130975466,
+    "id" : "L027",
+    "manufacturer" : "LEE",
+    "name" : "Medium Red",
+    "number" : "027",
+    "rgb" : {
+      "b" : 0.09803921568627451,
+      "g" : 0.03137254901960784,
+      "r" : 0.788235294117647
+    },
+    "transmission" : 0.04
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3482444706421296,
+    "cieY" : 0.31065960863578246,
+    "id" : "L035",
+    "manufacturer" : "LEE",
+    "name" : "Light Pink",
+    "number" : "035",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.7607843137254902,
+      "r" : 1
+    },
+    "transmission" : 0.7
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.38739038587762936,
+    "cieY" : 0.2947364750498641,
+    "id" : "L036",
+    "manufacturer" : "LEE",
+    "name" : "Medium Pink",
+    "number" : "036",
+    "rgb" : {
+      "b" : 0.7098039215686275,
+      "g" : 0.5803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.54
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.47492070194028085,
+    "cieY" : 0.24514621688799693,
+    "id" : "L046",
+    "manufacturer" : "LEE",
+    "name" : "Dark Magenta",
+    "number" : "046",
+    "rgb" : {
+      "b" : 0.4196078431372549,
+      "g" : 0.07058823529411765,
+      "r" : 0.7686274509803922
+    },
+    "transmission" : 0.08
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.34148763652193426,
+    "cieY" : 0.19709159105844526,
+    "id" : "L048",
+    "manufacturer" : "LEE",
+    "name" : "Rose Purple",
+    "number" : "048",
+    "rgb" : {
+      "b" : 0.6,
+      "g" : 0.2196078431372549,
+      "r" : 0.6588235294117647
+    },
+    "transmission" : 0.15
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3283198465452349,
+    "cieY" : 0.171183852992228,
+    "id" : "L049",
+    "manufacturer" : "LEE",
+    "name" : "Medium Purple",
+    "number" : "049",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.12156862745098039,
+      "r" : 0.6
+    },
+    "transmission" : 0.09
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2912026197412075,
+    "cieY" : 0.26474608967529156,
+    "id" : "L052",
+    "manufacturer" : "LEE",
+    "name" : "Light Lavender",
+    "number" : "052",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.7607843137254902,
+      "r" : 0.8705882352941177
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.30194422277443067,
+    "cieY" : 0.29780527108523946,
+    "id" : "L053",
+    "manufacturer" : "LEE",
+    "name" : "Paler Lavender",
+    "number" : "053",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8784313725490196,
+      "r" : 0.9294117647058824
+    },
+    "transmission" : 0.75
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.23868135335313484,
+    "cieY" : 0.15459905607401947,
+    "id" : "L058",
+    "manufacturer" : "LEE",
+    "name" : "Lavender",
+    "number" : "058",
+    "rgb" : {
+      "b" : 0.9490196078431372,
+      "g" : 0.3803921568627451,
+      "r" : 0.611764705882353
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2861787644300701,
+    "cieY" : 0.3080584729631183,
+    "id" : "L061",
+    "manufacturer" : "LEE",
+    "name" : "Mist Blue",
+    "number" : "061",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9215686274509803,
+      "r" : 0.8313725490196079
+    },
+    "transmission" : 0.68
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2715075752692885,
+    "cieY" : 0.29490663134754724,
+    "id" : "L063",
+    "manufacturer" : "LEE",
+    "name" : "Pale Blue",
+    "number" : "063",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8784313725490196,
+      "r" : 0.7411764705882353
+    },
+    "transmission" : 0.59
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.1927568552772077,
+    "cieY" : 0.19750674963310633,
+    "id" : "L068",
+    "manufacturer" : "LEE",
+    "name" : "Sky Blue",
+    "number" : "068",
+    "rgb" : {
+      "b" : 0.9411764705882353,
+      "g" : 0.5803921568627451,
+      "r" : 0.16862745098039217
+    },
+    "transmission" : 0.15
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.15560275161384846,
+    "cieY" : 0.07647759812323444,
+    "id" : "L071",
+    "manufacturer" : "LEE",
+    "name" : "Tokyo Blue",
+    "number" : "071",
+    "rgb" : {
+      "b" : 0.6,
+      "g" : 0.09803921568627451,
+      "r" : 0.0196078431372549
+    },
+    "transmission" : 0.01
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.17784653374611803,
+    "cieY" : 0.13932816418932342,
+    "id" : "L075",
+    "manufacturer" : "LEE",
+    "name" : "Evening Blue",
+    "number" : "075",
+    "rgb" : {
+      "b" : 0.7803921568627451,
+      "g" : 0.3411764705882353,
+      "r" : 0.1411764705882353
+    },
+    "transmission" : 0.1
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.1673619671049502,
+    "cieY" : 0.1176908041608943,
+    "id" : "L079",
+    "manufacturer" : "LEE",
+    "name" : "Just Blue",
+    "number" : "079",
+    "rgb" : {
+      "b" : 0.8588235294117647,
+      "g" : 0.3215686274509804,
+      "r" : 0.058823529411764705
+    },
+    "transmission" : 0.07
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16121684964677485,
+    "cieY" : 0.0960468771120319,
+    "id" : "L085",
+    "manufacturer" : "LEE",
+    "name" : "Deeper Blue",
+    "number" : "085",
+    "rgb" : {
+      "b" : 0.6784313725490196,
+      "g" : 0.18823529411764706,
+      "r" : 0.03137254901960784
+    },
+    "transmission" : 0.03
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3747037805973831,
+    "cieY" : 0.5013425234679433,
+    "id" : "L088",
+    "manufacturer" : "LEE",
+    "name" : "Lime Green",
+    "number" : "088",
+    "rgb" : {
+      "b" : 0.30196078431372547,
+      "g" : 0.9411764705882353,
+      "r" : 0.7803921568627451
+    },
+    "transmission" : 0.72
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.30346595814852756,
+    "cieY" : 0.5011947190385845,
+    "id" : "L089",
+    "manufacturer" : "LEE",
+    "name" : "Moss Green",
+    "number" : "089",
+    "rgb" : {
+      "b" : 0.34901960784313724,
+      "g" : 0.7607843137254902,
+      "r" : 0.3411764705882353
+    },
+    "transmission" : 0.36
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2915811439022854,
+    "cieY" : 0.5467999347494927,
+    "id" : "L090",
+    "manufacturer" : "LEE",
+    "name" : "Dark Yellow Green",
+    "number" : "090",
+    "rgb" : {
+      "b" : 0.21176470588235294,
+      "g" : 0.6392156862745098,
+      "r" : 0.10980392156862745
+    },
+    "transmission" : 0.13
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4335033843196723,
+    "cieY" : 0.48728796458114026,
+    "id" : "L101",
+    "manufacturer" : "LEE",
+    "name" : "Yellow",
+    "number" : "101",
+    "rgb" : {
+      "b" : 0.12156862745098039,
+      "g" : 0.9098039215686274,
+      "r" : 1
+    },
+    "transmission" : 0.82
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4354750321322773,
+    "cieY" : 0.43905602665127436,
+    "id" : "L102",
+    "manufacturer" : "LEE",
+    "name" : "Light Amber",
+    "number" : "102",
+    "rgb" : {
+      "b" : 0.34901960784313724,
+      "g" : 0.8,
+      "r" : 1
+    },
+    "transmission" : 0.75
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.37802576884945405,
+    "cieY" : 0.40367373203295176,
+    "id" : "L103",
+    "manufacturer" : "LEE",
+    "name" : "Straw",
+    "number" : "103",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.9098039215686274,
+      "r" : 1
+    },
+    "transmission" : 0.82
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4775126373494922,
+    "cieY" : 0.447535283700803,
+    "id" : "L104",
+    "manufacturer" : "LEE",
+    "name" : "Deep Amber",
+    "number" : "104",
+    "rgb" : {
+      "b" : 0.1411764705882353,
+      "g" : 0.7098039215686275,
+      "r" : 1
+    },
+    "transmission" : 0.66
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5405024621869905,
+    "cieY" : 0.4048392313199975,
+    "id" : "L105",
+    "manufacturer" : "LEE",
+    "name" : "Orange",
+    "number" : "105",
+    "rgb" : {
+      "b" : 0.058823529411764705,
+      "g" : 0.5019607843137255,
+      "r" : 1
+    },
+    "transmission" : 0.41
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.622685803567211,
+    "cieY" : 0.32494147861078226,
+    "id" : "L106",
+    "manufacturer" : "LEE",
+    "name" : "Primary Red",
+    "number" : "106",
+    "rgb" : {
+      "b" : 0.10980392156862745,
+      "g" : 0.050980392156862744,
+      "r" : 0.8705882352941177
+    },
+    "transmission" : 0.09
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.38001385929761816,
+    "cieY" : 0.3071895921837091,
+    "id" : "L107",
+    "manufacturer" : "LEE",
+    "name" : "Light Rose",
+    "number" : "107",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.6392156862745098,
+      "r" : 1
+    },
+    "transmission" : 0.55
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4129079944296336,
+    "cieY" : 0.35033050557012324,
+    "id" : "L108",
+    "manufacturer" : "LEE",
+    "name" : "English Rose",
+    "number" : "108",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.6588235294117647,
+      "r" : 1
+    },
+    "transmission" : 0.57
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4353418295034051,
+    "cieY" : 0.3501602946742289,
+    "id" : "L109",
+    "manufacturer" : "LEE",
+    "name" : "Light Salmon",
+    "number" : "109",
+    "rgb" : {
+      "b" : 0.5215686274509804,
+      "g" : 0.6,
+      "r" : 1
+    },
+    "transmission" : 0.55
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4081477078603972,
+    "cieY" : 0.2879613196688727,
+    "id" : "L110",
+    "manufacturer" : "LEE",
+    "name" : "Middle Rose",
+    "number" : "110",
+    "rgb" : {
+      "b" : 0.6588235294117647,
+      "g" : 0.5019607843137255,
+      "r" : 1
+    },
+    "transmission" : 0.46
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.44609110344009956,
+    "cieY" : 0.27695384819059865,
+    "id" : "L111",
+    "manufacturer" : "LEE",
+    "name" : "Dark Pink",
+    "number" : "111",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.3686274509803922,
+      "r" : 1
+    },
+    "transmission" : 0.33
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5018685445831239,
+    "cieY" : 0.26345672370201145,
+    "id" : "L113",
+    "manufacturer" : "LEE",
+    "name" : "Magenta",
+    "number" : "113",
+    "rgb" : {
+      "b" : 0.4196078431372549,
+      "g" : 0.10980392156862745,
+      "r" : 0.8705882352941177
+    },
+    "transmission" : 0.12
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.22465563312474432,
+    "cieY" : 0.32876025920596097,
+    "id" : "L115",
+    "manufacturer" : "LEE",
+    "name" : "Peacock Blue",
+    "number" : "115",
+    "rgb" : {
+      "b" : 0.6784313725490196,
+      "g" : 0.6784313725490196,
+      "r" : 0
+    },
+    "transmission" : 0.25
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.22739017821214644,
+    "cieY" : 0.3386046217608529,
+    "id" : "L116",
+    "manufacturer" : "LEE",
+    "name" : "Medium Blue Green",
+    "number" : "116",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.6,
+      "r" : 0
+    },
+    "transmission" : 0.17
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.25662237088760953,
+    "cieY" : 0.29115711386477505,
+    "id" : "L117",
+    "manufacturer" : "LEE",
+    "name" : "Steel Blue",
+    "number" : "117",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.8705882352941177,
+      "r" : 0.6392156862745098
+    },
+    "transmission" : 0.55
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21296807000297407,
+    "cieY" : 0.2535948316043032,
+    "id" : "L118",
+    "manufacturer" : "LEE",
+    "name" : "Light Blue",
+    "number" : "118",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.7098039215686275,
+      "r" : 0.25882352941176473
+    },
+    "transmission" : 0.25
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16494595179131533,
+    "cieY" : 0.10972287191824885,
+    "id" : "L119",
+    "manufacturer" : "LEE",
+    "name" : "Dark Blue",
+    "number" : "119",
+    "rgb" : {
+      "b" : 0.7607843137254902,
+      "g" : 0.25882352941176473,
+      "r" : 0.0392156862745098
+    },
+    "transmission" : 0.04
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.1597210804542552,
+    "cieY" : 0.0901921564658066,
+    "id" : "L120",
+    "manufacturer" : "LEE",
+    "name" : "Deep Blue",
+    "number" : "120",
+    "rgb" : {
+      "b" : 0.6509803921568628,
+      "g" : 0.1607843137254902,
+      "r" : 0.03137254901960784
+    },
+    "transmission" : 0.02
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.32526796754925036,
+    "cieY" : 0.5263827951036472,
+    "id" : "L121",
+    "manufacturer" : "LEE",
+    "name" : "LEE Green",
+    "number" : "121",
+    "rgb" : {
+      "b" : 0.30196078431372547,
+      "g" : 0.8784313725490196,
+      "r" : 0.47058823529411764
+    },
+    "transmission" : 0.56
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3035635879733973,
+    "cieY" : 0.5241236692173475,
+    "id" : "L122",
+    "manufacturer" : "LEE",
+    "name" : "Fern Green",
+    "number" : "122",
+    "rgb" : {
+      "b" : 0.3215686274509804,
+      "g" : 0.8196078431372549,
+      "r" : 0.3215686274509804
+    },
+    "transmission" : 0.45
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.28508257905875667,
+    "cieY" : 0.5311851607117746,
+    "id" : "L124",
+    "manufacturer" : "LEE",
+    "name" : "Dark Green",
+    "number" : "124",
+    "rgb" : {
+      "b" : 0.2784313725490196,
+      "g" : 0.7019607843137254,
+      "r" : 0.09803921568627451
+    },
+    "transmission" : 0.21
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3877989972390828,
+    "cieY" : 0.21161156341869364,
+    "id" : "L126",
+    "manufacturer" : "LEE",
+    "name" : "Mauve",
+    "number" : "126",
+    "rgb" : {
+      "b" : 0.47058823529411764,
+      "g" : 0.1411764705882353,
+      "r" : 0.6196078431372549
+    },
+    "transmission" : 0.08
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4014432237974846,
+    "cieY" : 0.2992105375458188,
+    "id" : "L127",
+    "manufacturer" : "LEE",
+    "name" : "Smokey Pink",
+    "number" : "127",
+    "rgb" : {
+      "b" : 0.5215686274509804,
+      "g" : 0.43137254901960786,
+      "r" : 0.788235294117647
+    },
+    "transmission" : 0.28
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.46419131714774814,
+    "cieY" : 0.2461182170106679,
+    "id" : "L128",
+    "manufacturer" : "LEE",
+    "name" : "Bright Pink",
+    "number" : "128",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.1607843137254902,
+      "r" : 0.9607843137254902
+    },
+    "transmission" : 0.18
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.31272660439158345,
+    "cieY" : 0.3290231524027522,
+    "id" : "L130",
+    "manufacturer" : "LEE",
+    "name" : "Clear",
+    "number" : "130",
+    "rgb" : {
+      "b" : 1,
+      "g" : 1,
+      "r" : 1
+    },
+    "transmission" : 0.92
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.24249409828855342,
+    "cieY" : 0.33306006068492716,
+    "id" : "L131",
+    "manufacturer" : "LEE",
+    "name" : "Marine Blue",
+    "number" : "131",
+    "rgb" : {
+      "b" : 0.8,
+      "g" : 0.8117647058823529,
+      "r" : 0.3411764705882353
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.1759285787974326,
+    "cieY" : 0.14955518954243874,
+    "id" : "L132",
+    "manufacturer" : "LEE",
+    "name" : "Medium Blue",
+    "number" : "132",
+    "rgb" : {
+      "b" : 0.8588235294117647,
+      "g" : 0.4117647058823529,
+      "r" : 0.050980392156862744
+    },
+    "transmission" : 0.09
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4968887505711068,
+    "cieY" : 0.40301070272271067,
+    "id" : "L134",
+    "manufacturer" : "LEE",
+    "name" : "Golden Amber",
+    "number" : "134",
+    "rgb" : {
+      "b" : 0.25882352941176473,
+      "g" : 0.5803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.48
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5758214225924181,
+    "cieY" : 0.37693515253459675,
+    "id" : "L135",
+    "manufacturer" : "LEE",
+    "name" : "Deep Golden Amber",
+    "number" : "135",
+    "rgb" : {
+      "b" : 0.050980392156862744,
+      "g" : 0.3803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.22
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2980413962390881,
+    "cieY" : 0.28028283820178984,
+    "id" : "L136",
+    "manufacturer" : "LEE",
+    "name" : "Pale Lavender",
+    "number" : "136",
+    "rgb" : {
+      "b" : 0.9686274509803922,
+      "g" : 0.788235294117647,
+      "r" : 0.8784313725490196
+    },
+    "transmission" : 0.64
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.275448187964049,
+    "cieY" : 0.2372786004716483,
+    "id" : "L137",
+    "manufacturer" : "LEE",
+    "name" : "Special Lavender",
+    "number" : "137",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.6196078431372549,
+      "r" : 0.7294117647058823
+    },
+    "transmission" : 0.44
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3287178384344696,
+    "cieY" : 0.4078751444693614,
+    "id" : "L138",
+    "manufacturer" : "LEE",
+    "name" : "Pale Green",
+    "number" : "138",
+    "rgb" : {
+      "b" : 0.6901960784313725,
+      "g" : 0.9686274509803922,
+      "r" : 0.8117647058823529
+    },
+    "transmission" : 0.76
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.29433686029574246,
+    "cieY" : 0.5674215734654445,
+    "id" : "L139",
+    "manufacturer" : "LEE",
+    "name" : "Primary Green",
+    "number" : "139",
+    "rgb" : {
+      "b" : 0.1411764705882353,
+      "g" : 0.5803921568627451,
+      "r" : 0.058823529411764705
+    },
+    "transmission" : 0.1
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.250618490440402,
+    "cieY" : 0.3090181938825099,
+    "id" : "L140",
+    "manufacturer" : "LEE",
+    "name" : "Summer Blue",
+    "number" : "140",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.8588235294117647,
+      "r" : 0.5215686274509804
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.19397836415622463,
+    "cieY" : 0.21295157752415306,
+    "id" : "L141",
+    "manufacturer" : "LEE",
+    "name" : "Bright Blue",
+    "number" : "141",
+    "rgb" : {
+      "b" : 0.8784313725490196,
+      "g" : 0.5803921568627451,
+      "r" : 0.0784313725490196
+    },
+    "transmission" : 0.19
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2510646841153609,
+    "cieY" : 0.208986528679945,
+    "id" : "L142",
+    "manufacturer" : "LEE",
+    "name" : "Pale Violet",
+    "number" : "142",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.5490196078431373,
+      "r" : 0.6196078431372549
+    },
+    "transmission" : 0.34
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.46637855907632936,
+    "cieY" : 0.4056110737982486,
+    "id" : "L147",
+    "manufacturer" : "LEE",
+    "name" : "Apricot",
+    "number" : "147",
+    "rgb" : {
+      "b" : 0.3411764705882353,
+      "g" : 0.6509803921568628,
+      "r" : 1
+    },
+    "transmission" : 0.55
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5017503125851434,
+    "cieY" : 0.2721850449760928,
+    "id" : "L148",
+    "manufacturer" : "LEE",
+    "name" : "Bright Rose",
+    "number" : "148",
+    "rgb" : {
+      "b" : 0.45098039215686275,
+      "g" : 0.1803921568627451,
+      "r" : 0.9490196078431372
+    },
+    "transmission" : 0.18
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3675046107949727,
+    "cieY" : 0.35296714599319395,
+    "id" : "L151",
+    "manufacturer" : "LEE",
+    "name" : "Gold Tint",
+    "number" : "151",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.8117647058823529,
+      "r" : 1
+    },
+    "transmission" : 0.76
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3847939438767576,
+    "cieY" : 0.3717612717022641,
+    "id" : "L152",
+    "manufacturer" : "LEE",
+    "name" : "Pale Gold",
+    "number" : "152",
+    "rgb" : {
+      "b" : 0.6392156862745098,
+      "g" : 0.8,
+      "r" : 1
+    },
+    "transmission" : 0.72
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.38642585332469914,
+    "cieY" : 0.3397551883517587,
+    "id" : "L153",
+    "manufacturer" : "LEE",
+    "name" : "Pale Salmon",
+    "number" : "153",
+    "rgb" : {
+      "b" : 0.6705882352941176,
+      "g" : 0.7098039215686275,
+      "r" : 1
+    },
+    "transmission" : 0.65
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.36570667257967787,
+    "cieY" : 0.33955965248958814,
+    "id" : "L154",
+    "manufacturer" : "LEE",
+    "name" : "Pale Rose",
+    "number" : "154",
+    "rgb" : {
+      "b" : 0.7411764705882353,
+      "g" : 0.7803921568627451,
+      "r" : 1
+    },
+    "transmission" : 0.72
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3934192799318523,
+    "cieY" : 0.3726483624563471,
+    "id" : "L156",
+    "manufacturer" : "LEE",
+    "name" : "Chocolate",
+    "number" : "156",
+    "rgb" : {
+      "b" : 0.4392156862745098,
+      "g" : 0.5607843137254902,
+      "r" : 0.7294117647058823
+    },
+    "transmission" : 0.4
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.43749204590150537,
+    "cieY" : 0.29596864570692655,
+    "id" : "L157",
+    "manufacturer" : "LEE",
+    "name" : "Pink",
+    "number" : "157",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.45098039215686275,
+      "r" : 1
+    },
+    "transmission" : 0.38
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5614973690524805,
+    "cieY" : 0.3885194345873964,
+    "id" : "L158",
+    "manufacturer" : "LEE",
+    "name" : "Deep Orange",
+    "number" : "158",
+    "rgb" : {
+      "b" : 0.050980392156862744,
+      "g" : 0.43137254901960786,
+      "r" : 1
+    },
+    "transmission" : 0.31
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3381672456852287,
+    "cieY" : 0.3615872843679939,
+    "id" : "L159",
+    "manufacturer" : "LEE",
+    "name" : "No Color Straw",
+    "number" : "159",
+    "rgb" : {
+      "b" : 0.8392156862745098,
+      "g" : 0.9686274509803922,
+      "r" : 1
+    },
+    "transmission" : 0.89
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.23563227232433706,
+    "cieY" : 0.26212328486902126,
+    "id" : "L161",
+    "manufacturer" : "LEE",
+    "name" : "Slate Blue",
+    "number" : "161",
+    "rgb" : {
+      "b" : 0.8509803921568627,
+      "g" : 0.6666666666666666,
+      "r" : 0.43137254901960786
+    },
+    "transmission" : 0.32
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3706388275147631,
+    "cieY" : 0.364244578446697,
+    "id" : "L162",
+    "manufacturer" : "LEE",
+    "name" : "Bastard Amber",
+    "number" : "162",
+    "rgb" : {
+      "b" : 0.6980392156862745,
+      "g" : 0.8313725490196079,
+      "r" : 1
+    },
+    "transmission" : 0.79
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6129754826281494,
+    "cieY" : 0.3342538284207963,
+    "id" : "L164",
+    "manufacturer" : "LEE",
+    "name" : "Flame Red",
+    "number" : "164",
+    "rgb" : {
+      "b" : 0.12156862745098039,
+      "g" : 0.1607843137254902,
+      "r" : 0.9607843137254902
+    },
+    "transmission" : 0.14
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.22491999122565762,
+    "cieY" : 0.2598599295975881,
+    "id" : "L165",
+    "manufacturer" : "LEE",
+    "name" : "Daylight Blue",
+    "number" : "165",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.7215686274509804,
+      "r" : 0.3803921568627451
+    },
+    "transmission" : 0.31
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2706700981407393,
+    "cieY" : 0.20112388400373288,
+    "id" : "L170",
+    "manufacturer" : "LEE",
+    "name" : "Deep Lavender",
+    "number" : "170",
+    "rgb" : {
+      "b" : 0.8705882352941177,
+      "g" : 0.47058823529411764,
+      "r" : 0.6784313725490196
+    },
+    "transmission" : 0.31
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21890467063858327,
+    "cieY" : 0.29795898407754634,
+    "id" : "L172",
+    "manufacturer" : "LEE",
+    "name" : "Lagoon Blue",
+    "number" : "172",
+    "rgb" : {
+      "b" : 0.8,
+      "g" : 0.7215686274509804,
+      "r" : 0.12156862745098039
+    },
+    "transmission" : 0.28
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.24218894546720107,
+    "cieY" : 0.26748950465706456,
+    "id" : "L174",
+    "manufacturer" : "LEE",
+    "name" : "Dark Steel Blue",
+    "number" : "174",
+    "rgb" : {
+      "b" : 0.8509803921568627,
+      "g" : 0.6784313725490196,
+      "r" : 0.47058823529411764
+    },
+    "transmission" : 0.36
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4417261397848764,
+    "cieY" : 0.37351009060531,
+    "id" : "L176",
+    "manufacturer" : "LEE",
+    "name" : "Loving Amber",
+    "number" : "176",
+    "rgb" : {
+      "b" : 0.47058823529411764,
+      "g" : 0.6392156862745098,
+      "r" : 1
+    },
+    "transmission" : 0.54
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5240574162454555,
+    "cieY" : 0.41960508931583307,
+    "id" : "L179",
+    "manufacturer" : "LEE",
+    "name" : "Chrome Orange",
+    "number" : "179",
+    "rgb" : {
+      "b" : 0.0392156862745098,
+      "g" : 0.5607843137254902,
+      "r" : 1
+    },
+    "transmission" : 0.46
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21955518853596478,
+    "cieY" : 0.12302828329586324,
+    "id" : "L180",
+    "manufacturer" : "LEE",
+    "name" : "Dark Lavender",
+    "number" : "180",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.23137254901960785,
+      "r" : 0.47058823529411764
+    },
+    "transmission" : 0.11
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.18040781928783994,
+    "cieY" : 0.08174739149507046,
+    "id" : "L181",
+    "manufacturer" : "LEE",
+    "name" : "Congo Blue",
+    "number" : "181",
+    "rgb" : {
+      "b" : 0.49019607843137253,
+      "g" : 0.03137254901960784,
+      "r" : 0.16862745098039217
+    },
+    "transmission" : 0.01
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.6147658611941729,
+    "cieY" : 0.32542178976868147,
+    "id" : "L182",
+    "manufacturer" : "LEE",
+    "name" : "Light Red",
+    "number" : "182",
+    "rgb" : {
+      "b" : 0.1411764705882353,
+      "g" : 0.09803921568627451,
+      "r" : 0.9215686274509803
+    },
+    "transmission" : 0.11
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.19109986121644817,
+    "cieY" : 0.20025909677371484,
+    "id" : "L183",
+    "manufacturer" : "LEE",
+    "name" : "Moonlight Blue",
+    "number" : "183",
+    "rgb" : {
+      "b" : 0.8784313725490196,
+      "g" : 0.5490196078431373,
+      "r" : 0.09803921568627451
+    },
+    "transmission" : 0.17
+  },
+  {
+    "category" : "cosmetic",
+    "cieX" : 0.35596460105830896,
+    "cieY" : 0.350610570145555,
+    "id" : "L184",
+    "manufacturer" : "LEE",
+    "name" : "Cosmetic Peach",
+    "number" : "184",
+    "rgb" : {
+      "b" : 0.7686274509803922,
+      "g" : 0.8509803921568627,
+      "r" : 1
+    },
+    "transmission" : 0.76
+  },
+  {
+    "category" : "cosmetic",
+    "cieX" : 0.33335150765594335,
+    "cieY" : 0.3178578758172305,
+    "id" : "L186",
+    "manufacturer" : "LEE",
+    "name" : "Cosmetic Silver Rose",
+    "number" : "186",
+    "rgb" : {
+      "b" : 0.8745098039215686,
+      "g" : 0.8313725490196079,
+      "r" : 0.9803921568627451
+    },
+    "transmission" : 0.74
+  },
+  {
+    "category" : "cosmetic",
+    "cieX" : 0.3592511624169187,
+    "cieY" : 0.3343854105958433,
+    "id" : "L187",
+    "manufacturer" : "LEE",
+    "name" : "Cosmetic Rouge",
+    "number" : "187",
+    "rgb" : {
+      "b" : 0.7607843137254902,
+      "g" : 0.7803921568627451,
+      "r" : 0.9882352941176471
+    },
+    "transmission" : 0.7
+  },
+  {
+    "category" : "cosmetic",
+    "cieX" : 0.3502634190265375,
+    "cieY" : 0.3554145802865755,
+    "id" : "L188",
+    "manufacturer" : "LEE",
+    "name" : "Cosmetic Highlight",
+    "number" : "188",
+    "rgb" : {
+      "b" : 0.788235294117647,
+      "g" : 0.8901960784313725,
+      "r" : 1
+    },
+    "transmission" : 0.8
+  },
+  {
+    "category" : "cosmetic",
+    "cieX" : 0.3155867407876446,
+    "cieY" : 0.35074344790642287,
+    "id" : "L189",
+    "manufacturer" : "LEE",
+    "name" : "Cosmetic Silver Moss",
+    "number" : "189",
+    "rgb" : {
+      "b" : 0.8784313725490196,
+      "g" : 0.9607843137254902,
+      "r" : 0.9019607843137255
+    },
+    "transmission" : 0.78
+  },
+  {
+    "category" : "cosmetic",
+    "cieX" : 0.29223972074540067,
+    "cieY" : 0.3185928868982113,
+    "id" : "L191",
+    "manufacturer" : "LEE",
+    "name" : "Cosmetic Aqua Blue",
+    "number" : "191",
+    "rgb" : {
+      "b" : 0.9803921568627451,
+      "g" : 0.9411764705882353,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.76
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4230229550301882,
+    "cieY" : 0.2904530426749882,
+    "id" : "L192",
+    "manufacturer" : "LEE",
+    "name" : "Flesh Pink",
+    "number" : "192",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.47058823529411764,
+      "r" : 1
+    },
+    "transmission" : 0.42
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.27248913634338595,
+    "cieY" : 0.20602252562501927,
+    "id" : "L194",
+    "manufacturer" : "LEE",
+    "name" : "Surprise Pink",
+    "number" : "194",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.5607843137254902,
+      "r" : 0.788235294117647
+    },
+    "transmission" : 0.41
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.1659631753738286,
+    "cieY" : 0.11142375050584533,
+    "id" : "L195",
+    "manufacturer" : "LEE",
+    "name" : "Zenith Blue",
+    "number" : "195",
+    "rgb" : {
+      "b" : 0.7803921568627451,
+      "g" : 0.27058823529411763,
+      "r" : 0.058823529411764705
+    },
+    "transmission" : 0.05
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.21695295180952182,
+    "cieY" : 0.23851199457391592,
+    "id" : "L196",
+    "manufacturer" : "LEE",
+    "name" : "True Blue",
+    "number" : "196",
+    "rgb" : {
+      "b" : 0.9019607843137255,
+      "g" : 0.6509803921568628,
+      "r" : 0.3411764705882353
+    },
+    "transmission" : 0.29
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2020813580117909,
+    "cieY" : 0.18529040277740982,
+    "id" : "L197",
+    "manufacturer" : "LEE",
+    "name" : "Alice Blue",
+    "number" : "197",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.47058823529411764,
+      "r" : 0.2901960784313726
+    },
+    "transmission" : 0.16
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.17857751682768078,
+    "cieY" : 0.1340475563727672,
+    "id" : "L198",
+    "manufacturer" : "LEE",
+    "name" : "Palace Blue",
+    "number" : "198",
+    "rgb" : {
+      "b" : 0.6784313725490196,
+      "g" : 0.2784313725490196,
+      "r" : 0.1411764705882353
+    },
+    "transmission" : 0.06
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16911705162474916,
+    "cieY" : 0.1025808865234188,
+    "id" : "L199",
+    "manufacturer" : "LEE",
+    "name" : "Regal Blue",
+    "number" : "199",
+    "rgb" : {
+      "b" : 0.6509803921568628,
+      "g" : 0.18823529411764706,
+      "r" : 0.12156862745098039
+    },
+    "transmission" : 0.04
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.3024298619843772,
+    "cieY" : 0.31911594773182156,
+    "id" : "L600",
+    "manufacturer" : "LEE",
+    "miredShift" : -12,
+    "name" : "Arctic White",
+    "number" : "600",
+    "rgb" : {
+      "b" : 1,
+      "g" : 0.9607843137254902,
+      "r" : 0.9333333333333333
+    },
+    "transmission" : 0.84
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2986274318615062,
+    "cieY" : 0.3163571420584574,
+    "id" : "L601",
+    "manufacturer" : "LEE",
+    "name" : "Silver",
+    "number" : "601",
+    "rgb" : {
+      "b" : 0.9490196078431372,
+      "g" : 0.9019607843137255,
+      "r" : 0.8627450980392157
+    },
+    "transmission" : 0.68
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.304240191035294,
+    "cieY" : 0.30933554191659296,
+    "id" : "L602",
+    "manufacturer" : "LEE",
+    "name" : "Platinum",
+    "number" : "602",
+    "rgb" : {
+      "b" : 0.9019607843137255,
+      "g" : 0.8313725490196079,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.65
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2917505392171718,
+    "cieY" : 0.3151596803665947,
+    "id" : "L603",
+    "manufacturer" : "LEE",
+    "name" : "Moonlight White",
+    "number" : "603",
+    "rgb" : {
+      "b" : 0.9607843137254902,
+      "g" : 0.9098039215686274,
+      "r" : 0.8313725490196079
+    },
+    "transmission" : 0.72
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.42499276788036155,
+    "cieY" : 0.45874398352895024,
+    "id" : "L642",
+    "manufacturer" : "LEE",
+    "name" : "Half Mustard Yellow",
+    "number" : "642",
+    "rgb" : {
+      "b" : 0.2784313725490196,
+      "g" : 0.7607843137254902,
+      "r" : 0.8705882352941177
+    },
+    "transmission" : 0.52
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.24329276164101757,
+    "cieY" : 0.13940446931915124,
+    "id" : "L701",
+    "manufacturer" : "LEE",
+    "name" : "Provence",
+    "number" : "701",
+    "rgb" : {
+      "b" : 0.7294117647058823,
+      "g" : 0.2196078431372549,
+      "r" : 0.49019607843137253
+    },
+    "transmission" : 0.1
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.29826271827560913,
+    "cieY" : 0.2862165662419452,
+    "id" : "L702",
+    "manufacturer" : "LEE",
+    "name" : "Special Pale Lavender",
+    "number" : "702",
+    "rgb" : {
+      "b" : 0.9803921568627451,
+      "g" : 0.8196078431372549,
+      "r" : 0.8901960784313725
+    },
+    "transmission" : 0.66
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2859717812789649,
+    "cieY" : 0.24890277721409643,
+    "id" : "L704",
+    "manufacturer" : "LEE",
+    "name" : "Lily",
+    "number" : "704",
+    "rgb" : {
+      "b" : 0.9607843137254902,
+      "g" : 0.6784313725490196,
+      "r" : 0.8117647058823529
+    },
+    "transmission" : 0.49
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.19514417557017535,
+    "cieY" : 0.08967931526130729,
+    "id" : "L707",
+    "manufacturer" : "LEE",
+    "name" : "Ultimate Violet",
+    "number" : "707",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.050980392156862744,
+      "r" : 0.2784313725490196
+    },
+    "transmission" : 0.02
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.24866592041306843,
+    "cieY" : 0.2638725127860194,
+    "id" : "L711",
+    "manufacturer" : "LEE",
+    "name" : "Cold Blue",
+    "number" : "711",
+    "rgb" : {
+      "b" : 0.9215686274509803,
+      "g" : 0.7215686274509804,
+      "r" : 0.5607843137254902
+    },
+    "transmission" : 0.38
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2407202275434309,
+    "cieY" : 0.2518439258797204,
+    "id" : "L712",
+    "manufacturer" : "LEE",
+    "name" : "Bedford Blue",
+    "number" : "712",
+    "rgb" : {
+      "b" : 0.8705882352941177,
+      "g" : 0.6509803921568628,
+      "r" : 0.49019607843137253
+    },
+    "transmission" : 0.34
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.18140179635595277,
+    "cieY" : 0.13821019428545278,
+    "id" : "L713",
+    "manufacturer" : "LEE",
+    "name" : "J.Winter Blue",
+    "number" : "713",
+    "rgb" : {
+      "b" : 0.6196078431372549,
+      "g" : 0.25882352941176473,
+      "r" : 0.1411764705882353
+    },
+    "transmission" : 0.05
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.18345523795960597,
+    "cieY" : 0.1532623985317443,
+    "id" : "L715",
+    "manufacturer" : "LEE",
+    "name" : "Cabana Blue",
+    "number" : "715",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.4,
+      "r" : 0.1803921568627451
+    },
+    "transmission" : 0.12
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16713593811527686,
+    "cieY" : 0.10925145080906655,
+    "id" : "L716",
+    "manufacturer" : "LEE",
+    "name" : "Mikkel Blue",
+    "number" : "716",
+    "rgb" : {
+      "b" : 0.6705882352941176,
+      "g" : 0.2196078431372549,
+      "r" : 0.0784313725490196
+    },
+    "transmission" : 0.04
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.16873241987620682,
+    "cieY" : 0.11817456863519721,
+    "id" : "L721",
+    "manufacturer" : "LEE",
+    "name" : "Berry Blue",
+    "number" : "721",
+    "rgb" : {
+      "b" : 0.8313725490196079,
+      "g" : 0.30980392156862746,
+      "r" : 0.09019607843137255
+    },
+    "transmission" : 0.08
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.17870979837372536,
+    "cieY" : 0.152361021120331,
+    "id" : "L722",
+    "manufacturer" : "LEE",
+    "name" : "Bray Blue",
+    "number" : "722",
+    "rgb" : {
+      "b" : 0.788235294117647,
+      "g" : 0.3803921568627451,
+      "r" : 0.09803921568627451
+    },
+    "transmission" : 0.11
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.20205304996450957,
+    "cieY" : 0.2300143545479647,
+    "id" : "L724",
+    "manufacturer" : "LEE",
+    "name" : "Ocean Blue",
+    "number" : "724",
+    "rgb" : {
+      "b" : 0.8509803921568627,
+      "g" : 0.6,
+      "r" : 0.1607843137254902
+    },
+    "transmission" : 0.24
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.25424397478093264,
+    "cieY" : 0.299858396863796,
+    "id" : "L725",
+    "manufacturer" : "LEE",
+    "name" : "Old Steel Blue",
+    "number" : "725",
+    "rgb" : {
+      "b" : 0.9019607843137255,
+      "g" : 0.8117647058823529,
+      "r" : 0.5490196078431373
+    },
+    "transmission" : 0.48
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.27861886142234576,
+    "cieY" : 0.3640439810203383,
+    "id" : "L728",
+    "manufacturer" : "LEE",
+    "name" : "Steel Green",
+    "number" : "728",
+    "rgb" : {
+      "b" : 0.7294117647058823,
+      "g" : 0.8313725490196079,
+      "r" : 0.5411764705882353
+    },
+    "transmission" : 0.5
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2984334135501457,
+    "cieY" : 0.3832853146075248,
+    "id" : "L730",
+    "manufacturer" : "LEE",
+    "name" : "Liberty Green",
+    "number" : "730",
+    "rgb" : {
+      "b" : 0.7294117647058823,
+      "g" : 0.9019607843137255,
+      "r" : 0.6588235294117647
+    },
+    "transmission" : 0.62
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.2769578519252482,
+    "cieY" : 0.5049825752511841,
+    "id" : "L735",
+    "manufacturer" : "LEE",
+    "name" : "Velvet Green",
+    "number" : "735",
+    "rgb" : {
+      "b" : 0.25882352941176473,
+      "g" : 0.5490196078431373,
+      "r" : 0.058823529411764705
+    },
+    "transmission" : 0.11
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.3130939218804238,
+    "cieY" : 0.5645716740008028,
+    "id" : "L738",
+    "manufacturer" : "LEE",
+    "name" : "JAS Green",
+    "number" : "738",
+    "rgb" : {
+      "b" : 0.1803921568627451,
+      "g" : 0.8313725490196079,
+      "r" : 0.30196078431372547
+    },
+    "transmission" : 0.38
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4318468485292424,
+    "cieY" : 0.39164986337029895,
+    "id" : "L742",
+    "manufacturer" : "LEE",
+    "name" : "Bram Brown",
+    "number" : "742",
+    "rgb" : {
+      "b" : 0.2784313725490196,
+      "g" : 0.43137254901960786,
+      "r" : 0.6196078431372549
+    },
+    "transmission" : 0.22
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.34873372194152874,
+    "cieY" : 0.3583956274028262,
+    "id" : "L744",
+    "manufacturer" : "LEE",
+    "miredShift" : 48,
+    "name" : "Dirty White",
+    "number" : "744",
+    "rgb" : {
+      "b" : 0.7607843137254902,
+      "g" : 0.8705882352941177,
+      "r" : 0.9607843137254902
+    },
+    "tintShift" : -0.08,
+    "transmission" : 0.72
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4573156888489705,
+    "cieY" : 0.4006324063436839,
+    "id" : "L746",
+    "manufacturer" : "LEE",
+    "name" : "Brown",
+    "number" : "746",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.30196078431372547,
+      "r" : 0.47058823529411764
+    },
+    "transmission" : 0.1
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.35724265172680325,
+    "cieY" : 0.35823108177598945,
+    "id" : "L747",
+    "manufacturer" : "LEE",
+    "miredShift" : 65,
+    "name" : "Easy White",
+    "number" : "747",
+    "rgb" : {
+      "b" : 0.7411764705882353,
+      "g" : 0.8509803921568627,
+      "r" : 0.9803921568627451
+    },
+    "transmission" : 0.68
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.3599795180795866,
+    "cieY" : 0.3805051980693918,
+    "id" : "L763",
+    "manufacturer" : "LEE",
+    "miredShift" : 30,
+    "name" : "Wheat",
+    "number" : "763",
+    "rgb" : {
+      "b" : 0.7215686274509804,
+      "g" : 0.9215686274509803,
+      "r" : 1
+    },
+    "transmission" : 0.82
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.384358205260694,
+    "cieY" : 0.40119885942802774,
+    "id" : "L764",
+    "manufacturer" : "LEE",
+    "miredShift" : 45,
+    "name" : "Sun Colour Straw",
+    "number" : "764",
+    "rgb" : {
+      "b" : 0.6,
+      "g" : 0.8784313725490196,
+      "r" : 1
+    },
+    "transmission" : 0.76
+  },
+  {
+    "category" : "colorCorrection",
+    "cieX" : 0.4106239499609548,
+    "cieY" : 0.41938109809378205,
+    "id" : "L765",
+    "manufacturer" : "LEE",
+    "miredShift" : 62,
+    "name" : "LEE Yellow",
+    "number" : "765",
+    "rgb" : {
+      "b" : 0.47843137254901963,
+      "g" : 0.8313725490196079,
+      "r" : 1
+    },
+    "transmission" : 0.68
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5686360941296569,
+    "cieY" : 0.372893961143848,
+    "id" : "L777",
+    "manufacturer" : "LEE",
+    "name" : "Rust",
+    "number" : "777",
+    "rgb" : {
+      "b" : 0.09803921568627451,
+      "g" : 0.3215686274509804,
+      "r" : 0.8509803921568627
+    },
+    "transmission" : 0.2
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5454208980171393,
+    "cieY" : 0.3985692413785618,
+    "id" : "L778",
+    "manufacturer" : "LEE",
+    "name" : "Millennium Gold",
+    "number" : "778",
+    "rgb" : {
+      "b" : 0.0784313725490196,
+      "g" : 0.47058823529411764,
+      "r" : 0.9803921568627451
+    },
+    "transmission" : 0.34
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.5978413788545747,
+    "cieY" : 0.3116478233316365,
+    "id" : "L787",
+    "manufacturer" : "LEE",
+    "name" : "Marius Red",
+    "number" : "787",
+    "rgb" : {
+      "b" : 0.1607843137254902,
+      "g" : 0.0392156862745098,
+      "r" : 0.7215686274509804
+    },
+    "transmission" : 0.04
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4391500537955598,
+    "cieY" : 0.2354424262881469,
+    "id" : "L793",
+    "manufacturer" : "LEE",
+    "name" : "Vanity Fair",
+    "number" : "793",
+    "rgb" : {
+      "b" : 0.5803921568627451,
+      "g" : 0.1803921568627451,
+      "r" : 0.9215686274509803
+    },
+    "transmission" : 0.17
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.4138947583154471,
+    "cieY" : 0.21595811100017767,
+    "id" : "L795",
+    "manufacturer" : "LEE",
+    "name" : "Magical Magenta",
+    "number" : "795",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.12156862745098039,
+      "r" : 0.788235294117647
+    },
+    "transmission" : 0.12
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.263685658820963,
+    "cieY" : 0.12890410941451771,
+    "id" : "L797",
+    "manufacturer" : "LEE",
+    "name" : "Deep Purple",
+    "number" : "797",
+    "rgb" : {
+      "b" : 0.5490196078431373,
+      "g" : 0.058823529411764705,
+      "r" : 0.4196078431372549
+    },
+    "transmission" : 0.03
+  },
+  {
+    "category" : "theatrical",
+    "cieX" : 0.27399544948764804,
+    "cieY" : 0.1403423913348147,
+    "id" : "L798",
+    "manufacturer" : "LEE",
+    "name" : "Chrysalis Pink",
+    "number" : "798",
+    "rgb" : {
+      "b" : 0.6784313725490196,
+      "g" : 0.12941176470588237,
+      "r" : 0.5490196078431373
+    },
+    "transmission" : 0.07
+  }
+]

@@ -94,7 +94,9 @@ enum ScreenshotTour {
     }
 
     static var mainWindow: NSWindow? {
-        NSApp.windows.first { $0.isVisible && $0.contentView != nil && !($0 is NSPanel) && $0.frame.width > 600 }
+        NSApp.windows.first {
+            $0.isVisible && $0.contentView != nil && !($0 is NSPanel) && $0.sheetParent == nil && $0.frame.width > 600
+        }
     }
 
     private static func prepareWindow() {
@@ -104,7 +106,8 @@ enum ScreenshotTour {
         frame.size = w.frameRect(forContentRect: NSRect(origin: .zero, size: size)).size
         if let screen = w.screen ?? NSScreen.main {
             // Centered horizontally: on small CI displays (1024 pt wide) the window overhangs both
-            // edges, but centered sheets and popovers stay fully on-screen.
+            // edges, but centered sheets and popovers stay fully on-screen. `capture` stitches
+            // display-wide tiles so the whole window still ends up in the screenshot.
             frame.origin = NSPoint(x: screen.visibleFrame.midX - frame.width / 2,
                                    y: screen.visibleFrame.maxY - frame.height)
         }
@@ -113,17 +116,14 @@ enum ScreenshotTour {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// Captures the main window (plus any attached sheet, composited in place) to a PNG.
+    /// Captures the main window to a PNG. The window-server capture already includes any
+    /// attached sheet (it is part of the window's group), so nothing is composited on top.
     /// Returns the method used ("window-server" or "cache") or nil on failure.
     @discardableResult
     static func capture(to url: URL) async -> String? {
         guard let w = mainWindow else { return nil }
-        if let image = await windowServerImage(of: w) {
-            var composed = image
-            if let sheet = w.attachedSheet, let sheetImage = await windowServerImage(of: sheet) {
-                composed = composite(base: image, baseFrame: w.frame, overlay: sheetImage, overlayFrame: sheet.frame) ?? image
-            }
-            if writePNG(composed, to: url) { return "window-server" }
+        if let image = await fullWindowImage(of: w), writePNG(image, to: url) {
+            return "window-server"
         }
         // Fallback: AppKit rendering (no permission needed, but glass/vibrancy render blank).
         guard cacheCapture(window: w, to: url) else { return nil }
@@ -134,9 +134,67 @@ enum ScreenshotTour {
         return "cache"
     }
 
-    /// Real on-screen appearance via ScreenCaptureKit (works even where the window extends past
-    /// the display). Needs screen-recording permission, which CI grants to processes started
-    /// from the runner shell. Times out after a few seconds instead of hanging.
+    /// The window server leaves the parts of a window that hang off the display blank, and CI
+    /// displays (1024 pt) are narrower than the tour window (1440 pt). So when the window is
+    /// wider than the display, capture it in display-wide tiles — sliding the window so each
+    /// strip is on-screen in turn — and stitch the strips back together.
+    static func fullWindowImage(of w: NSWindow) async -> CGImage? {
+        guard let screen = w.screen ?? NSScreen.main else { return await windowServerImage(of: w) }
+        let visible = screen.visibleFrame
+        let windowWidth = w.frame.width
+        guard windowWidth > visible.width + 1, visible.width > 100 else { return await windowServerImage(of: w) }
+
+        // Tile offsets (in window points): 0, V, 2V, … and finally flush right.
+        var offsets: [CGFloat] = []
+        var next: CGFloat = 0
+        while next + visible.width < windowWidth {
+            offsets.append(next)
+            next += visible.width
+        }
+        offsets.append(windowWidth - visible.width)
+
+        let originalOrigin = w.frame.origin
+        defer { w.setFrameOrigin(originalOrigin) }
+        var tiles: [(image: CGImage, from: CGFloat, to: CGFloat)] = []
+        var covered: CGFloat = 0
+        for offset in offsets {
+            w.setFrameOrigin(NSPoint(x: visible.minX - offset, y: originalOrigin.y))
+            await sleep(0.35)
+            guard let image = await windowServerImage(of: w) else { return nil }
+            let end = min(offset + visible.width, windowWidth)
+            tiles.append((image: image, from: covered, to: end))
+            covered = end
+        }
+        return stitch(tiles, windowWidth: windowWidth)
+    }
+
+    /// Joins horizontal strips; each tile contributes window points `from..<to`.
+    static func stitch(_ tiles: [(image: CGImage, from: CGFloat, to: CGFloat)], windowWidth: CGFloat) -> CGImage? {
+        guard let first = tiles.first?.image else { return nil }
+        let width = tiles.map { $0.image.width }.min() ?? first.width
+        let height = tiles.map { $0.image.height }.min() ?? first.height
+        guard width > 0, height > 0,
+              let ctx = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        let scale = CGFloat(width) / max(windowWidth, 1)
+        for tile in tiles {
+            let strip = CGRect(x: (tile.from * scale).rounded(.down), y: 0,
+                               width: ((tile.to - tile.from) * scale).rounded(.up), height: CGFloat(height))
+            ctx.saveGState()
+            ctx.clip(to: strip)
+            // Align tops (Core Graphics origin is bottom-left).
+            ctx.draw(tile.image, in: CGRect(x: 0, y: CGFloat(height - tile.image.height),
+                                            width: CGFloat(tile.image.width), height: CGFloat(tile.image.height)))
+            ctx.restoreGState()
+        }
+        return ctx.makeImage()
+    }
+
+    /// Real on-screen appearance via ScreenCaptureKit (glass and vibrancy render correctly; parts
+    /// of the window that hang off the display come back blank — see `fullWindowImage`). Needs
+    /// screen-recording permission, which CI grants to processes started from the runner shell.
+    /// Times out after a few seconds instead of hanging.
     static func windowServerImage(of window: NSWindow) async -> CGImage? {
         let windowID = CGWindowID(window.windowNumber)
         return await withTaskGroup(of: CGImage?.self) { group in
@@ -164,21 +222,6 @@ enum ScreenshotTour {
             group.cancelAll()
             return first
         }
-    }
-
-    /// Draws `overlay` (e.g. a sheet) on top of `base` at its on-screen position.
-    static func composite(base: CGImage, baseFrame: NSRect, overlay: CGImage, overlayFrame: NSRect) -> CGImage? {
-        let scale = CGFloat(base.width) / max(baseFrame.width, 1)
-        guard let ctx = CGContext(data: nil, width: base.width, height: base.height, bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
-        ctx.draw(base, in: CGRect(x: 0, y: 0, width: base.width, height: base.height))
-        // Core Graphics origin is bottom-left, like screen coordinates.
-        let rect = CGRect(x: (overlayFrame.minX - baseFrame.minX) * scale,
-                          y: (overlayFrame.minY - baseFrame.minY) * scale,
-                          width: overlayFrame.width * scale, height: overlayFrame.height * scale)
-        ctx.draw(overlay, in: rect)
-        return ctx.makeImage()
     }
 
     static func writePNG(_ image: CGImage, to url: URL) -> Bool {

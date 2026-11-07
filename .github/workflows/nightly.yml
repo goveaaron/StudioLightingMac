@@ -1,0 +1,108 @@
+name: Nightly
+
+# Deep reliability checks that are too slow for every push: the whole test suite and the app's
+# self-test + screenshot tour under Thread Sanitizer and Address Sanitizer, on Linux and macOS.
+# Timing-sensitive tests (names containing "Budget" or "Performance") are skipped under
+# sanitizers, and the app's frame-budget self-check is loosened via PRISM_PERF_BUDGET_SCALE.
+
+on:
+  schedule:
+    - cron: '23 10 * * *'   # ≈ 2:23 am Pacific
+  workflow_dispatch:
+    inputs:
+      macos:
+        description: Also run the macOS jobs
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux · ${{ matrix.sanitizer }} sanitizer
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [thread, address]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: |
+          # TSan can't map its shadow memory with the runners' high-entropy ASLR; a container job
+          # can't change this host setting, so run the Swift image from the host instead.
+          sudo sysctl -w vm.mmap_rnd_bits=28
+          docker run --rm -v "$PWD:/src" -w /src \
+            -e TSAN_OPTIONS="halt_on_error=1 second_deadlock_stack=1" \
+            -e ASAN_OPTIONS="detect_leaks=0 halt_on_error=1" \
+            swift:6.3 \
+            swift test --sanitize=${{ matrix.sanitizer }} --skip 'Budget|Performance' 2>&1 | tee test.log
+          exit "${PIPESTATUS[0]}"
+      - name: Sanitizer reports
+        if: failure()
+        run: |
+          grep -n -A40 -E "WARNING: ThreadSanitizer|ERROR: AddressSanitizer|runtime error:" test.log | head -400 || true
+
+  macos:
+    name: macOS · ${{ matrix.sanitizer }} sanitizer
+    if: github.event_name == 'schedule' || inputs.macos
+    runs-on: macos-26
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [thread, address]
+    env:
+      SAN_DIR: ${{ github.workspace }}/san-logs
+      PRISM_PERF_BUDGET_SCALE: '25'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: |
+          if [ -d /Applications/Xcode_26.6.app ]; then sudo xcode-select -s /Applications/Xcode_26.6.app; fi
+          swift --version
+          mkdir -p "$SAN_DIR"
+      - name: Unit tests
+        env:
+          TSAN_OPTIONS: halt_on_error=1 second_deadlock_stack=1
+          ASAN_OPTIONS: detect_leaks=0 halt_on_error=1
+        run: |
+          swift test --sanitize=${{ matrix.sanitizer }} --skip 'Budget|Performance' 2>&1 | tee "$SAN_DIR/unit-tests.log"
+          exit "${PIPESTATUS[0]}"
+      - name: Bundle app (${{ matrix.sanitizer }} sanitizer)
+        if: success() || failure()
+        run: scripts/build_app.sh --sanitize ${{ matrix.sanitizer }} --out dist-san
+      - name: Self-test and screenshot tour
+        if: success() || failure()
+        env:
+          # Keep running after a report so one run collects every issue; reports go to files.
+          TSAN_OPTIONS: halt_on_error=0 second_deadlock_stack=1 log_path=${{ github.workspace }}/san-logs/tsan
+          ASAN_OPTIONS: detect_leaks=0 halt_on_error=1 log_path=${{ github.workspace }}/san-logs/asan
+        run: |
+          set +e
+          scripts/mac-timeout.sh 600 dist-san/Prism.app/Contents/MacOS/Prism --self-test 2>&1 | tee "$SAN_DIR/self-test.log"
+          st=${PIPESTATUS[0]}
+          mkdir -p "$SAN_DIR/shots"
+          scripts/mac-timeout.sh 1800 dist-san/Prism.app/Contents/MacOS/Prism --screenshot-tour "$SAN_DIR/shots" > "$SAN_DIR/tour.log" 2>&1
+          tt=$?
+          echo "self-test exit $st, tour exit $tt"
+          reports=$(ls "$SAN_DIR"/tsan.* "$SAN_DIR"/asan.* 2>/dev/null | wc -l | tr -d ' ')
+          echo "sanitizer report files: $reports"
+          for f in "$SAN_DIR"/tsan.* "$SAN_DIR"/asan.*; do
+            [ -f "$f" ] || continue
+            echo "===== $f"; head -c 20000 "$f"; echo
+          done
+          if [ "$st" != 0 ] || [ "$tt" != 0 ] || [ "$reports" != 0 ]; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: nightly-${{ matrix.sanitizer }}
+          path: ${{ github.workspace }}/san-logs
+          retention-days: 10
+          if-no-files-found: ignore

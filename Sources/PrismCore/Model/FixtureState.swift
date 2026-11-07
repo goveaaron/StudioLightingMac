@@ -11,7 +11,13 @@ public struct CellState: Codable, Hashable, Sendable {
     }
 
     public static func mix(_ a: CellState, _ b: CellState, _ t: Double) -> CellState {
-        CellState(intensity: lerp(a.intensity, b.intensity, clamp01(t)), color: LightColor.mix(a.color, b.color, t))
+        let t = clamp01(t.finiteOr(0))
+        if t <= 0 { return a }
+        if t >= 1 { return b }
+        return CellState(
+            intensity: FixtureState.mixIntensity(a.intensity, b.intensity, t),
+            color: LightColor.mix(a.color, b.color, t)
+        )
     }
 }
 
@@ -54,13 +60,28 @@ public struct FixtureState: Codable, Hashable, Sendable {
 
     public var hasPixelData: Bool { !(cells?.isEmpty ?? true) }
 
+    /// Interpolates two intensity values (0…1) in CIE L* perceptual lightness space so that a
+    /// 50% crossfade (`t = 0.5`) from 0 to 1 looks like half perceived brightness rather than ~80%.
+    @inline(__always)
+    public static func mixIntensity(_ a: Double, _ b: Double, _ t: Double) -> Double {
+        let t = clamp01(t.finiteOr(0))
+        let ia = clamp01(a.finiteOr(0))
+        let ib = clamp01(b.finiteOr(0))
+        if t <= 0 { return ia }
+        if t >= 1 { return ib }
+        if abs(ia - ib) < 1e-9 { return ia }
+        let pA = ColorMath.linearToPerceptualIntensity(ia)
+        let pB = ColorMath.linearToPerceptualIntensity(ib)
+        return ColorMath.perceptualToLinearIntensity(lerp(pA, pB, t))
+    }
+
     /// Perceptual blend between two states (used by crossfades).
     public static func mix(_ a: FixtureState, _ b: FixtureState, _ t: Double) -> FixtureState {
-        let t = clamp01(t)
+        let t = clamp01(t.finiteOr(0))
         if t <= 0 { return a }
         if t >= 1 { return b }
         var out = FixtureState(
-            intensity: lerp(a.intensity, b.intensity, t),
+            intensity: mixIntensity(a.intensity, b.intensity, t),
             color: LightColor.mix(a.color, b.color, t),
             cells: nil,
             strobeHz: t < 0.5 ? a.strobeHz : b.strobeHz,
