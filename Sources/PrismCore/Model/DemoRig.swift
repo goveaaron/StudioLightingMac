@@ -2,10 +2,11 @@ import Foundation
 
 /// Built-in demo / template projects.
 ///
-/// `londonStudio()` mirrors the layout of the studio Prism was designed for (from the owner's
-/// Lightkey screenshot): a round dimmer (P1), eight 16-pixel tubes (B1–B8) around the subject and
-/// a square RGBWW panel (PN1). It uses generic profiles so it works without the curated library;
-/// once the real models are known the fixtures can be swapped with "Replace fixture type".
+/// `londonStudio()` mirrors the studio Prism was designed for (from the owner's Lightkey
+/// screenshot): a round dimmer (P1), eight amaran PT4c pixel tubes (B1–B8) around the subject in
+/// their recommended "LE CCT&RGB 8 px" mode (8 zones × intensity, CCT, ±green, crossfade, R, G, B)
+/// and an amaran F22c key panel (PN1), all in Universe 1. The profiles come from the curated
+/// library; fixtures can be swapped with "Replace fixture type" if the real models differ.
 public enum DemoRig {
     public static let pixelTubeID = "amaran.pt4c"
     public static let pixelTubeMode = "Light Engine CCT & RGB 8 Pixels"
