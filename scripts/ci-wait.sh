@@ -11,6 +11,8 @@
 #
 # Exit status: 0 = green, 1 = failed, 2 = no run found (yet), 3 = cancelled (superseded),
 #              4 = still running — run this script again.
+# CI_EVENT selects the trigger (default: push; e.g. CI_EVENT=workflow_dispatch for a manual
+# release run, CI_EVENT=any for whichever run is newest).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 GH=/opt/antigravity/bin/gh
@@ -27,6 +29,9 @@ if [[ ${#SHA} -lt 40 ]]; then
   [[ -n "$FULL" ]] && SHA="$FULL"
 fi
 MAX_WAIT="${CI_WAIT_MAX:-540}"
+EVENT="${CI_EVENT:-push}"
+EVENT_ARGS=()
+[[ "$EVENT" != "any" ]] && EVENT_ARGS=(--event "$EVENT")
 START=$(date +%s)
 
 elapsed() { echo $(( $(date +%s) - START )); }
@@ -35,7 +40,7 @@ gh_() { timeout 60 "$GH" "$@"; }
 RUN=""
 while true; do
   RUN="$(gh_ run list -R "$REPO" --branch "$BRANCH" --commit "$SHA" --workflow ci.yml \
-        --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
+        "${EVENT_ARGS[@]}" --json databaseId -q '.[0].databaseId' 2>/dev/null || true)"
   [[ -n "$RUN" ]] && break
   if (( $(elapsed) > 180 )); then
     echo "No CI run found for $BRANCH@$SHA yet (pushed? GitHub can lag) — run this script again."

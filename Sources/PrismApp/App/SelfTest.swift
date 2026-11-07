@@ -64,10 +64,14 @@ enum SelfTest {
                     await Task.yield()
                 }
                 #if DEBUG
-                let budget = (median: 25.0, p95: 50.0)   // unoptimized build: only catch pathological regressions
+                var budget = (median: 25.0, p95: 50.0)   // unoptimized build: only catch pathological regressions
                 #else
-                let budget = (median: 3.0, p95: 6.0)
+                var budget = (median: 3.0, p95: 6.0)
                 #endif
+                // Sanitizer runs (nightly TSan/ASan) are many times slower: they loosen the budget.
+                if let scale = ProcessInfo.processInfo.environment["PRISM_PERF_BUDGET_SCALE"].flatMap({ Double($0) }), scale > 0 {
+                    budget = (budget.median * scale, budget.p95 * scale)
+                }
                 let ok = best.median < budget.median && best.p95 < budget.p95
                 return ok ? nil : String(format: "Frame p95 %.2f ms (median %.2f ms), budget p95 %.0f ms / median %.0f ms",
                                          best.p95, best.median, budget.p95, budget.median)
