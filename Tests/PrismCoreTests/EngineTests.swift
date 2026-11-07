@@ -164,11 +164,12 @@ final class EngineTests: XCTestCase {
         _ = exec.apply([.fadeTime(2.0), .setIntensity(.id(fixtureID), 1.0)], to: &doc)
 
         let snap1 = ShowSnapshot(document: doc, library: lib.definition)
-        // Render at t = 11.0 (halfway through fade -> intensity = 0.5)
+        // Render at t = 11.0 (halfway through fade -> 50% perceived brightness; intensity fades
+        // perceptually via `FixtureState.mixIntensity`, so this is ~0.184 linear, not 0.5)
         now = 11.0
         let frameAtInterrupt = EngineCore.renderFrame(snap1, time: now)
         let midIntensity = frameAtInterrupt.states[fixtureID]?.intensity ?? -1
-        XCTAssertEqual(midIntensity, 0.5, accuracy: 1e-4)
+        XCTAssertEqual(midIntensity, FixtureState.mixIntensity(0, 1, 0.5), accuracy: 1e-4)
 
         // Interrupt at t = 11.0 with a new 2.0s fade to 0.2!
         _ = exec.apply(
