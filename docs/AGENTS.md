@@ -47,6 +47,12 @@ git push -q -u origin agent/<name>
 scripts/ci-wait.sh agent/<name>     # blocks until done; prints errors; exit 0 = green
 ```
 
+`ci-wait.sh` exit codes: 0 green · 1 failed (prints the error excerpt) · 2 no run found yet ·
+3 cancelled (superseded by a newer push) · **4 still running — just run it again**. Background
+commands on this VM are killed after 10 minutes, so the script gives up waiting after ~9 minutes
+with exit 4 rather than dying silently. Pass a full or short SHA as the 2nd argument to wait for a
+specific commit (e.g. `scripts/ci-wait.sh main <sha>` after landing).
+
 `ci-wait.sh` downloads the screenshot artifact to `/tmp/prism-ci/<run-id>/screenshots/`.
 **Look at the PNGs with the file viewer.** That is the only way to see the UI. Judge them
 critically: alignment, spacing, contrast, clipped text, empty states, beauty.
