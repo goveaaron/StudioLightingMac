@@ -7,7 +7,11 @@
 #   --version    CFBundleShortVersionString (default 0.1.0 or $PRISM_VERSION)
 #   --build      CFBundleVersion (default 0 or $PRISM_BUILD)
 #   --out        output directory (default ./dist)
-# Result: <out>/Prism.app, ad-hoc signed.
+#   --sign-identity NAME  codesign identity (default $PRISM_SIGN_IDENTITY; keychain from
+#                $PRISM_SIGN_KEYCHAIN). Falls back to ad-hoc when missing or unusable.
+#   --sanitize KIND  build with a sanitizer (thread | address | undefined; not with --universal).
+#                Nightly CI runs the self-test and tour on such builds.
+# Result: <out>/Prism.app, signed with the stable Prism identity when available, else ad-hoc.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,6 +20,9 @@ UNIVERSAL=0
 VERSION="${PRISM_VERSION:-0.1.0}"
 BUILD="${PRISM_BUILD:-0}"
 OUT=dist
+SIGN_IDENTITY="${PRISM_SIGN_IDENTITY:-}"
+SIGN_KEYCHAIN="${PRISM_SIGN_KEYCHAIN:-}"
+SANITIZE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --release) CONFIG=release ;;
@@ -23,7 +30,9 @@ while [[ $# -gt 0 ]]; do
     --version) VERSION="$2"; shift ;;
     --build) BUILD="$2"; shift ;;
     --out) OUT="$2"; shift ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    --sign-identity) SIGN_IDENTITY="$2"; shift ;;
+    --sanitize) SANITIZE="$2"; shift ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     *) echo "build_app.sh: unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -33,12 +42,16 @@ if [[ "$(uname)" != "Darwin" ]]; then
   echo "build_app.sh must run on macOS" >&2
   exit 1
 fi
+if [[ -n "$SANITIZE" && $UNIVERSAL == 1 ]]; then
+  echo "build_app.sh: --sanitize can't be combined with --universal" >&2
+  exit 2
+fi
 
 APP="$OUT/Prism.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-echo "==> Building Prism ($CONFIG, universal=$UNIVERSAL)"
+echo "==> Building Prism ($CONFIG, universal=$UNIVERSAL${SANITIZE:+, sanitize=$SANITIZE})"
 if [[ $UNIVERSAL == 1 ]]; then
   bins=()
   for arch in arm64 x86_64; do
@@ -48,8 +61,8 @@ if [[ $UNIVERSAL == 1 ]]; then
   done
   lipo -create "${bins[@]}" -output "$APP/Contents/MacOS/Prism"
 else
-  swift build -c "$CONFIG" --product Prism
-  cp "$(swift build -c "$CONFIG" --show-bin-path)/Prism" "$APP/Contents/MacOS/Prism"
+  swift build -c "$CONFIG" --product Prism ${SANITIZE:+--sanitize="$SANITIZE"}
+  cp "$(swift build -c "$CONFIG" ${SANITIZE:+--sanitize="$SANITIZE"} --show-bin-path)/Prism" "$APP/Contents/MacOS/Prism"
 fi
 chmod +x "$APP/Contents/MacOS/Prism"
 
@@ -77,9 +90,19 @@ if [[ -f "$ICON_SRC" ]]; then
   iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 fi
 
-echo "==> Signing (ad-hoc)"
-codesign --force --deep --sign - --timestamp=none "$APP"
+if [[ -n "$SIGN_IDENTITY" ]] && security find-identity -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
+  echo "==> Signing ($SIGN_IDENTITY)"
+  if ! codesign --force --deep --sign "$SIGN_IDENTITY" ${SIGN_KEYCHAIN:+--keychain "$SIGN_KEYCHAIN"} --timestamp=none "$APP"; then
+    echo "warning: signing with '$SIGN_IDENTITY' failed; falling back to ad-hoc" >&2
+    codesign --force --deep --sign - --timestamp=none "$APP"
+  fi
+else
+  [[ -n "$SIGN_IDENTITY" ]] && echo "warning: identity '$SIGN_IDENTITY' not found; signing ad-hoc" >&2
+  echo "==> Signing (ad-hoc)"
+  codesign --force --deep --sign - --timestamp=none "$APP"
+fi
 codesign --verify --deep --strict "$APP"
+codesign -d -r- "$APP" 2>&1 | grep -i "designated" || true
 
 echo "==> Built $APP"
 lipo -info "$APP/Contents/MacOS/Prism" || true

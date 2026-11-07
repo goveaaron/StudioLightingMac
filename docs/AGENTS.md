@@ -47,13 +47,22 @@ git push -q -u origin agent/<name>
 scripts/ci-wait.sh agent/<name>     # blocks until done; prints errors; exit 0 = green
 ```
 
+`ci-wait.sh` exit codes: 0 green · 1 failed (prints the error excerpt) · 2 no run found yet ·
+3 cancelled (superseded by a newer push) · **4 still running — just run it again**. Background
+commands on this VM are killed after 10 minutes, so the script gives up waiting after ~9 minutes
+with exit 4 rather than dying silently. Pass a full or short SHA as the 2nd argument to wait for a
+specific commit (e.g. `scripts/ci-wait.sh main <sha>` after landing). Commits that only touch
+`docs/**` or root-level `*.md` files don't trigger CI at all (ci-wait then exits 2; that's fine).
+
 `ci-wait.sh` downloads the screenshot artifact to `/tmp/prism-ci/<run-id>/screenshots/`.
 **Look at the PNGs with the file viewer.** That is the only way to see the UI. Judge them
 critically: alignment, spacing, contrast, clipped text, empty states, beauty.
 
 Screenshot facts:
-- The runner display is 1024×768 pt, so the 1440 pt window overhangs both edges and captures
-  come out about 1440×732.
+- The runner display is 1024×768 pt. The tour window is 1440 pt wide, so the tour captures it in
+  display-wide tiles and stitches them: screenshots show the **whole** window width (about
+  1440×732; the height is limited by the display). White bands at the edges would mean a capture
+  problem, not your layout — tell the orchestrator.
 - Captures come from the window server, so glass and vibrancy render correctly.
 - `tour.log` lists each scene and its capture method.
 - The CI log (`gh run view --log-failed`, or the job log) includes the app's launch log. Look
@@ -97,6 +106,12 @@ Need a bigger change in someone else's area? Message the orchestrator.
   no `try!`, no `fatalError`, no unchecked indexing, never block main or the engine.
 - Portable logic goes in `PrismCore` with XCTest tests in `Tests/PrismCoreTests/`
   (one file per area, e.g. `EffectsTests.swift`). Aim for meaningful coverage of edge cases.
+- **Timing-sensitive tests** (frame budgets, throughput) must have `Budget` or `Performance` in
+  their test name. The nightly workflow (`.github/workflows/nightly.yml`) runs every test, plus
+  the app's self-test and tour, under Thread and Address Sanitizer, and skips tests matching
+  `Budget|Performance`. App-side timing checks should scale their limits by the
+  `PRISM_PERF_BUDGET_SCALE` environment variable (see `engine.frameBudget` in `SelfTest.swift`).
+  Treat any sanitizer report in your area as a real bug.
 - App features add `SelfTest` checks and `ScreenshotTour` scenes for every screen/state.
 - Preserve existing comments/docstrings. Document public APIs with `///`.
 - No new package dependencies without asking the orchestrator (current: swift-nio only).
