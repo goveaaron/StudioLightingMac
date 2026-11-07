@@ -23,13 +23,14 @@ final class DemoRigTests: XCTestCase {
         let lib = TestResources.library()
         XCTAssertTrue(lib.problems.isEmpty, "Library problems: \(lib.problems)")
         let tube = try XCTUnwrap(lib.definition(DemoRig.pixelTubeID))
-        let mode = try XCTUnwrap(tube.modes.first { $0.name == DemoRig.pixelTubeMode })
-        XCTAssertEqual(mode.channelCount, 49)
-        XCTAssertEqual(mode.cellCount, 16)
+        let mode = try XCTUnwrap(tube.mode(named: DemoRig.pixelTubeMode))
+        XCTAssertEqual(mode.channelCount, 56)
+        XCTAssertEqual(mode.cellCount, 8)
         XCTAssertTrue(mode.capabilities.hasRGB)
+        XCTAssertTrue(mode.capabilities.hasCCT)
         XCTAssertNotNil(lib.definition(DemoRig.panelID))
         XCTAssertNotNil(lib.definition(DemoRig.dimmerID))
-        XCTAssertGreaterThanOrEqual(lib.count, 8)
+        XCTAssertGreaterThanOrEqual(lib.count, 2000)
     }
 
     func testDemoRigPatchIsValid() {
@@ -53,11 +54,12 @@ final class DemoRigTests: XCTestCase {
         let u1 = try XCTUnwrap(frame.universes[1])
         XCTAssertEqual(u1.count, 512)
         XCTAssertEqual(u1[0], 255, "P1 dimmer at full")
-        // B1 starts at address 2: dimmer then 16 × RGB. Cyan → low red, high green+blue.
-        XCTAssertEqual(u1[1], 255, "B1 master dimmer")
-        XCTAssertLessThan(u1[2], 60, "B1 pixel 1 red should be low for cyan")
-        XCTAssertGreaterThan(u1[3], 150, "B1 pixel 1 green")
-        XCTAssertGreaterThan(u1[4], 200, "B1 pixel 1 blue")
+        // B1 (amaran PT4c LE CCT&RGB 8 px) starts at address 2 (index 1):
+        // Each pixel cell is 7 channels: [Dimmer, CCT, G/M, Crossfade, Red, Green, Blue].
+        XCTAssertEqual(u1[1], 255, "B1 pixel 1 dimmer")
+        XCTAssertLessThan(u1[5], 60, "B1 pixel 1 red should be low for cyan")
+        XCTAssertGreaterThan(u1[6], 150, "B1 pixel 1 green")
+        XCTAssertGreaterThan(u1[7], 200, "B1 pixel 1 blue")
     }
 
     func testProjectRoundTrip() throws {
