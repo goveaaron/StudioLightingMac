@@ -36,6 +36,11 @@ struct FixtureSearchIndex: Sendable {
     let docs: [Doc]
     private let vocab: [String]
     private let vocabBytes: [[UInt8]]
+    /// The whole vocabulary as one byte buffer (`vocabStart[t]` = offset of token `t`). The typo
+    /// scan reads it through raw pointers: nested arrays cost ARC and generic calls per access in
+    /// unoptimized (debug/CI) builds, which made that scan 10× slower than it needs to be.
+    private let vocabFlat: [UInt8]
+    private let vocabStart: [Int32]
     private let postings: [[Int32]]
     private let grams: [UInt32: [Int32]]
     private let byLength: [[Int32]]
@@ -211,6 +216,17 @@ struct FixtureSearchIndex: Sendable {
         self.docs = docs
         self.vocab = vocab
         self.vocabBytes = vocabBytes
+        var flat: [UInt8] = []
+        flat.reserveCapacity(vocabBytes.reduce(0) { $0 + $1.count })
+        var starts: [Int32] = []
+        starts.reserveCapacity(vocabBytes.count + 1)
+        for bytes in vocabBytes {
+            starts.append(Int32(flat.count))
+            flat.append(contentsOf: bytes)
+        }
+        starts.append(Int32(flat.count))
+        self.vocabFlat = flat
+        self.vocabStart = starts
         self.postings = postings
         self.grams = grams
         self.byLength = byLength
@@ -416,15 +432,36 @@ struct FixtureSearchIndex: Sendable {
         let minLen = max(3, qLen - maxDistance)
         guard minLen < byLength.count else { return }
         let first = wBytes[0], last = wBytes[qLen - 1]
-        var scratch = [Int](repeating: 0, count: 3 * (qLen + maxDistance + 1))
-        for len in minLen..<byLength.count {
-            let compareLen = min(len, qLen + maxDistance)
-            for t in byLength[len] {
-                let tok = vocabBytes[Int(t)]
-                if tok[0] != first && tok[compareLen - 1] != last { continue }
-                guard let d = Self.editDistance(wBytes, tok, compareLen: compareLen, maxDistance: maxDistance,
-                                                scratch: &scratch), d > 0 else { continue }
-                out.append((t, d == 1 ? Self.fuzzy1Score : Self.fuzzy2Score))
+        let rowCapacity = 3 * (qLen + maxDistance + 1)
+        let rows = UnsafeMutablePointer<Int>.allocate(capacity: rowCapacity)
+        rows.initialize(repeating: 0, count: rowCapacity)
+        defer { rows.deallocate() }
+        wBytes.withUnsafeBufferPointer { wordBuffer in
+            vocabFlat.withUnsafeBufferPointer { flatBuffer in
+                vocabStart.withUnsafeBufferPointer { startBuffer in
+                    guard let word = wordBuffer.baseAddress, let flat = flatBuffer.baseAddress,
+                          let starts = startBuffer.baseAddress else { return }
+                    var len = minLen
+                    while len < byLength.count {
+                        let compareLen = min(len, qLen + maxDistance)
+                        byLength[len].withUnsafeBufferPointer { bucketBuffer in
+                            guard let bucket = bucketBuffer.baseAddress else { return }
+                            let count = bucketBuffer.count
+                            var k = 0
+                            while k < count {
+                                let t = bucket[k]
+                                k += 1
+                                let tok = flat + Int(starts[Int(t)])
+                                if tok[0] != first && tok[compareLen - 1] != last { continue }
+                                guard let d = Self.editDistance(word, qLen, tok, compareLen,
+                                                                maxDistance: maxDistance, rows: rows),
+                                      d > 0 else { continue }
+                                out.append((t, d == 1 ? Self.fuzzy1Score : Self.fuzzy2Score))
+                            }
+                        }
+                        len += 1
+                    }
+                }
             }
         }
     }
@@ -518,38 +555,48 @@ struct FixtureSearchIndex: Sendable {
         return false
     }
 
-    /// Optimal-string-alignment distance (Levenshtein + adjacent transpositions) between `a` and
-    /// the first `compareLen` bytes of `b`, or nil when it exceeds `maxDistance`.
-    private static func editDistance(_ a: [UInt8], _ b: [UInt8], compareLen m: Int, maxDistance: Int,
-                                     scratch: inout [Int]) -> Int? {
-        let n = a.count
-        guard m <= b.count, abs(n - m) <= maxDistance else { return nil }
-        let width = m + 1
-        if scratch.count < 3 * width { scratch = [Int](repeating: 0, count: 3 * width) }
-        // Rows: (i-2) at offset r0, (i-1) at r1, i at r2 — rotated each iteration.
-        var r0 = 0, r1 = width, r2 = 2 * width
-        for j in 0...m { scratch[r1 + j] = j }
+    /// Optimal-string-alignment distance (Levenshtein + adjacent transpositions) between the `n`
+    /// bytes at `a` and the first `m` bytes at `b`, or nil when it exceeds `maxDistance`.
+    /// `rows` must hold at least 3 × (m + 1) Ints. Raw pointers, while-loops and hand-written
+    /// minimums keep it fast in unoptimized builds too (no generic calls, ARC or bounds checks).
+    private static func editDistance(_ a: UnsafePointer<UInt8>, _ n: Int, _ b: UnsafePointer<UInt8>, _ m: Int,
+                                     maxDistance: Int, rows: UnsafeMutablePointer<Int>) -> Int? {
+        if (n > m ? n - m : m - n) > maxDistance { return nil }
         if n == 0 { return m <= maxDistance ? m : nil }
-        for i in 1...n {
-            scratch[r2] = i
+        let width = m + 1
+        // Rows (i-2), (i-1) and i, rotated each iteration.
+        var r0 = rows, r1 = rows + width, r2 = rows + 2 * width
+        var j = 0
+        while j <= m { r1[j] = j; j += 1 }
+        var i = 1
+        while i <= n {
+            r2[0] = i
             var rowMin = i
             let ai = a[i - 1]
-            if m >= 1 {
-                for j in 1...m {
-                    let bj = b[j - 1]
-                    let cost = ai == bj ? 0 : 1
-                    var value = min(scratch[r1 + j] + 1, scratch[r2 + j - 1] + 1, scratch[r1 + j - 1] + cost)
-                    if i > 1, j > 1, ai == b[j - 2], a[i - 2] == bj {
-                        value = min(value, scratch[r0 + j - 2] + 1)
-                    }
-                    scratch[r2 + j] = value
-                    if value < rowMin { rowMin = value }
+            j = 1
+            while j <= m {
+                let bj = b[j - 1]
+                var value = r1[j] + 1
+                let insertion = r2[j - 1] + 1
+                if insertion < value { value = insertion }
+                let substitution = r1[j - 1] + (ai == bj ? 0 : 1)
+                if substitution < value { value = substitution }
+                if i > 1 && j > 1 && ai == b[j - 2] && a[i - 2] == bj {
+                    let transposition = r0[j - 2] + 1
+                    if transposition < value { value = transposition }
                 }
+                r2[j] = value
+                if value < rowMin { rowMin = value }
+                j += 1
             }
             if rowMin > maxDistance { return nil }
-            (r0, r1, r2) = (r1, r2, r0)
+            let oldest = r0
+            r0 = r1
+            r1 = r2
+            r2 = oldest
+            i += 1
         }
-        let d = scratch[r1 + m]
+        let d = r1[m]
         return d <= maxDistance ? d : nil
     }
 }
