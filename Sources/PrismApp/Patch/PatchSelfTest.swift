@@ -68,6 +68,52 @@ enum PatchSelfTest {
                 }
                 return nil
             },
+            SelfTest.Check(name: "patch.addLightWizard") { app in
+                let wizard = AddLightWizardModel.shared
+                let before = app.show.fixtures.count
+                wizard.reset()
+                wizard.select(DemoRig.pixelTubeID, app: app)
+                wizard.quantity = 2
+                guard let plan = wizard.plan(app: app) else {
+                    return "No plan for 2 × \(DemoRig.pixelTubeID) (definition missing?)"
+                }
+                guard plan.assignments.count == 2 else {
+                    return "Plan placed \(plan.assignments.count) of 2 lights"
+                }
+                guard wizard.commit(app: app) else { return "Adding the planned lights failed" }
+
+                var failure: String?
+                let ids = wizard.added.map(\.id)
+                if ids.count != 2 || app.show.fixtures.count != before + 2 {
+                    failure = "Expected 2 new lights, got \(ids.count) (show has \(app.show.fixtures.count), was \(before))"
+                } else if !PatchMath.conflicts(app.show.resolvedFixtures).isEmpty {
+                    failure = "The wizard created an address conflict"
+                } else {
+                    for (id, planned) in zip(ids, plan.assignments) {
+                        guard let rf = app.show.resolved(id) else { failure = "New light \(id) not found"; break }
+                        if rf.fixture.address != planned.address || rf.fixture.universe != planned.universe {
+                            failure = "Light landed at \(rf.fixture.universe).\(rf.fixture.address ?? 0); the plan said \(planned.universe).\(planned.address)"
+                            break
+                        }
+                        if rf.mode.name != plan.modeName {
+                            failure = "Light got mode \(rf.mode.name); the plan said \(plan.modeName)"
+                            break
+                        }
+                        let steps = SetupWalkthrough.make(for: rf)?.steps.count ?? 0
+                        if steps < 3 {
+                            failure = "Setup walkthrough has only \(steps) steps"
+                            break
+                        }
+                    }
+                }
+                // One undo step must remove everything the wizard added.
+                app.show.undo()
+                wizard.reset()
+                if failure == nil && app.show.fixtures.count != before {
+                    failure = "One undo didn't remove the wizard's lights (\(app.show.fixtures.count) vs \(before))"
+                }
+                return failure
+            },
         ]
     }
 }

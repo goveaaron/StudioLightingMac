@@ -75,6 +75,50 @@ extension ShowController {
         return (ids, allocation)
     }
 
+    /// Adds lights the way the Add Light wizard showed them: the plan's mode, addressing style and
+    /// addresses. The plan is re-checked against the current patch first, so even if something
+    /// changed in the meantime the new lights never overlap existing ones. One undo step.
+    @discardableResult
+    func addPlannedFixtures(_ plan: NewLightPlan, baseName: String?, role: FixtureRole) -> [UUID] {
+        guard let def = library.definition(plan.definitionID) ?? project.definition(plan.definitionID) else { return [] }
+        let checked = NewLightPlanner.plan(definition: def, quantity: plan.quantity, preferredModeName: plan.modeName,
+                                           style: plan.style, existing: resolvedFixtures)
+        guard let mode = def.mode(named: checked.modeName), !checked.assignments.isEmpty else { return [] }
+
+        let stage = project.stage
+        let cleanBase = (baseName?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? def.model
+        let n = checked.assignments.count
+        var currentFixtures = project.fixtures
+        var newFixtures: [PatchedFixture] = []
+        for (i, assign) in checked.assignments.enumerated() {
+            let short = PatchMath.suggestShortName(role: role, category: def.category, existingFixtures: currentFixtures)
+            let existingInRole = currentFixtures.filter { $0.role == role }.count
+            let transform = PatchMath.suggestTransform(role: role, index: existingInRole,
+                                                       count: max(existingInRole + (n - i), n), stage: stage)
+            let fx = PatchedFixture(
+                name: n > 1 ? "\(cleanBase) \(i + 1)" : cleanBase,
+                shortName: short,
+                definitionID: def.id,
+                modeName: mode.name,
+                universe: assign.universe,
+                address: assign.address,
+                role: role,
+                transform: transform
+            )
+            newFixtures.append(fx)
+            currentFixtures.append(fx)
+        }
+        let ids = newFixtures.map(\.id)
+        editProject(n > 1 ? "Add \(n) Lights" : "Add Light") { p in
+            p.fixtures.append(contentsOf: newFixtures)
+            if !p.definitions.contains(where: { $0.id == def.id }) {
+                p.definitions.append(def)
+            }
+        }
+        selection = Set(ids)
+        return ids
+    }
+
     /// Unpatches fixtures (sets `address = nil`) without deleting them from the project or stage.
     func unpatchFixtures(_ ids: Set<UUID>) {
         guard !ids.isEmpty else { return }
