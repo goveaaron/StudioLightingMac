@@ -107,6 +107,18 @@ public enum ChannelKind: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// Kinds a fixture (or one pixel cell) has at most once per mode: a second coarse channel of
+    /// the same kind and cell would overlap the first. Service kinds (generic, effect, control,
+    /// reserved...) may legitimately repeat.
+    public var isUniqueRole: Bool {
+        switch self {
+        case .intensity, .cct, .tint, .hue, .saturation, .cieX, .cieY, .crossfade, .pan, .tilt, .zoom, .focus, .iris:
+            return true
+        default:
+            return isEmitter
+        }
+    }
+
     /// True if this channel kind is an advanced/service channel by default.
     public var isAdvancedByDefault: Bool {
         switch self {
@@ -414,18 +426,18 @@ public struct ChannelDefinition: Codable, Hashable, Sendable {
     /// `capabilities` if available, falling back to `physical` range.
     public func dmxValue(forPhysical value: Double) -> UInt8 {
         if let caps = capabilities, !caps.isEmpty {
-            // Check stepped capabilities first for exact match (e.g. neutral tint = 0).
-            var bestStepped: (cap: ChannelCapability, dist: Double)?
+            // Stepped capabilities first for an exact match (e.g. neutral tint = 0). When the same
+            // meaning appears in several ranges (amaran G/M has "Neutral" at 0–10 and 120–145),
+            // prefer the range holding the channel's default so neutral renders as documented (128).
+            var firstExact: ChannelCapability?
             for cap in caps {
-                if let p = cap.physical, p.count == 1 {
-                    let d = abs(p[0] - value)
-                    if d < 1e-6 {
-                        return cap.centerValue
-                    }
-                    if bestStepped == nil || d < bestStepped!.dist {
-                        bestStepped = (cap, d)
-                    }
-                } else if let p = cap.physical, p.count >= 2 {
+                guard let p = cap.physical, p.count == 1, abs(p[0] - value) < 1e-6 else { continue }
+                if Int(cap.from) <= Int(defaultValue), Int(defaultValue) <= Int(cap.to) { return defaultValue }
+                if firstExact == nil { firstExact = cap }
+            }
+            if let exact = firstExact { return exact.centerValue }
+            for cap in caps {
+                if let p = cap.physical, p.count >= 2 {
                     let lo = min(p[0], p[1]), hi = max(p[0], p[1])
                     if value >= lo && value <= hi && p[1] != p[0] {
                         let f = clamp01((value - p[0]) / (p[1] - p[0]))
@@ -901,7 +913,7 @@ public enum FixtureVerification: String, Codable, CaseIterable, Sendable {
     public init(from decoder: Decoder) throws {
         let raw = (try? decoder.singleValueContainer().decode(String.self)) ?? ""
         switch raw {
-        case "manufacturerChart", "manufacturer", "verified", "official":
+        case "manufacturerChart", "manufacturer_chart", "manufacturer", "verified", "official":
             self = .manufacturerChart
         case "community", "ofl", "qlc", "qlcplus":
             self = .community
@@ -1093,8 +1105,9 @@ public struct FixtureDefinition: Codable, Hashable, Sendable, Identifiable {
                             let r = rc.range ?? rc.dmx ?? [0, 255]
                             let f = clamp((r.first ?? 0) / scale, 0, 255)
                             let t = clamp((r.count > 1 ? r[1] : (r.first ?? 0)) / scale, f, 255)
-                            let phys: [Double]? = rc.physical
-                                ?? ((rc.from != nil && rc.to != nil) ? [rc.from!, rc.to!] : (rc.value.map { [$0] }))
+                            var phys: [Double]? = rc.physical
+                            if phys == nil, let from = rc.from, let to = rc.to { phys = [from, to] }
+                            if phys == nil, let v = rc.value { phys = [v] }
                             var tag = rc.tag ?? rc.kind
                             if tag == "none", let lbl = rc.label?.lowercased(), lbl.contains("off") || lbl.contains("no ") {
                                 tag = "off"
@@ -1198,11 +1211,34 @@ public struct FixtureDefinition: Codable, Hashable, Sendable, Identifiable {
     }
 
     public func mode(named name: String) -> FixtureMode? {
-        modes.first { $0.name == name }
-            ?? modes.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
-            ?? modes.first { $0.shortName?.caseInsensitiveCompare(name) == .orderedSame }
-            ?? modes.first { $0.fixtureMenuName?.caseInsensitiveCompare(name) == .orderedSame }
-            ?? modes.first { $0.friendlyName?.caseInsensitiveCompare(name) == .orderedSame }
+        if let exact = modes.first(where: { $0.name == name })
+            ?? modes.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame })
+            ?? modes.first(where: { $0.shortName?.caseInsensitiveCompare(name) == .orderedSame })
+            ?? modes.first(where: { $0.fixtureMenuName?.caseInsensitiveCompare(name) == .orderedSame })
+            ?? modes.first(where: { $0.friendlyName?.caseInsensitiveCompare(name) == .orderedSame }) {
+            return exact
+        }
+        func canonical(_ s: String) -> String {
+            var out = s.lowercased()
+            // Strip leading menu numbering like "9: "
+            if let colon = out.firstIndex(of: ":"), out.distance(from: out.startIndex, to: colon) <= 3 {
+                let prefix = out[..<colon]
+                if prefix.allSatisfy({ $0.isNumber || $0 == " " }) {
+                    out = String(out[out.index(after: colon)...])
+                }
+            }
+            out = out.replacingOccurrences(of: "light engine", with: "le")
+            out = out.replacingOccurrences(of: "pixels", with: "px")
+            out = out.replacingOccurrences(of: "pixel", with: "px")
+            return String(out.filter { $0.isLetter || $0.isNumber })
+        }
+        let target = canonical(name)
+        guard !target.isEmpty else { return nil }
+        return modes.first { m in
+            canonical(m.name) == target
+                || (m.shortName.map { canonical($0) == target } ?? false)
+                || (m.fixtureMenuName.map { canonical($0) == target } ?? false)
+        }
     }
 
     public var recommendedMode: FixtureMode? {
@@ -1220,5 +1256,64 @@ public struct FixtureDefinitionFile: Codable, Sendable {
     public init(schemaVersion: Int = 1, fixtures: [FixtureDefinition]) {
         self.schemaVersion = schemaVersion
         self.fixtures = fixtures
+    }
+}
+
+// MARK: - Validation
+
+extension FixtureDefinition {
+    /// Result of `validate()`: `issues` make a profile unusable or wrong (must be fixed);
+    /// `warnings` are legal but unusual layouts worth knowing about.
+    public struct Validation: Sendable {
+        public var issues: [String] = []
+        public var warnings: [String] = []
+        public var isValid: Bool { issues.isEmpty }
+    }
+
+    /// Structural problems that would make a profile misbehave when patched; empty when valid.
+    public var validationIssues: [String] { validate().issues }
+
+    /// Checks every mode.
+    ///
+    /// Issues: no modes; 0 or more than 512 channels (the footprint is exactly the channel
+    /// list); duplicate mode names; a fine (LSB) channel without a coarse channel of the same
+    /// kind and cell before it.
+    ///
+    /// Warnings: a role claimed twice for the same cell (two "pan" channels, a second "red"
+    /// without a pixel number). Both channels then follow the same control, which is what
+    /// multi-zone fixtures without pixel numbering expect, but a hand-made profile with this is
+    /// usually a mistake.
+    public func validate() -> Validation {
+        struct Role: Hashable { let kind: ChannelKind; let cell: Int? }
+        var result = Validation()
+        if modes.isEmpty { result.issues.append("\(id): no modes") }
+        var names = Set<String>()
+        for mode in modes {
+            let place = "\(id) · \(mode.name)"
+            if !names.insert(mode.name).inserted { result.issues.append("\(place): duplicate mode name") }
+            if mode.channelCount < 1 || mode.channelCount > 512 {
+                result.issues.append("\(place): \(mode.channelCount) channels (must be 1–512)")
+            }
+            var coarse: [Role: Int] = [:]
+            var fine: [Role: Int] = [:]
+            for (index, channel) in mode.channels.enumerated() {
+                let role = Role(kind: channel.kind, cell: channel.cell)
+                let cellText = channel.cell.map { " (cell \($0 + 1))" } ?? ""
+                if channel.fine {
+                    let pairs = fine[role, default: 0]
+                    if pairs >= coarse[role, default: 0] {
+                        result.issues.append("\(place): fine channel \(index + 1) (\(channel.kind.rawValue)\(cellText)) has no coarse channel before it")
+                    }
+                    fine[role] = pairs + 1
+                } else {
+                    let count = coarse[role, default: 0] + 1
+                    coarse[role] = count
+                    if count > 1, channel.kind.isUniqueRole {
+                        result.warnings.append("\(place): channel \(index + 1) repeats \(channel.kind.rawValue)\(cellText)")
+                    }
+                }
+            }
+        }
+        return result
     }
 }
