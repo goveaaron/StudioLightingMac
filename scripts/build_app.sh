@@ -7,7 +7,9 @@
 #   --version    CFBundleShortVersionString (default 0.1.0 or $PRISM_VERSION)
 #   --build      CFBundleVersion (default 0 or $PRISM_BUILD)
 #   --out        output directory (default ./dist)
-# Result: <out>/Prism.app, ad-hoc signed.
+#   --sign-identity NAME  codesign identity (default $PRISM_SIGN_IDENTITY; keychain from
+#                $PRISM_SIGN_KEYCHAIN). Falls back to ad-hoc when missing or unusable.
+# Result: <out>/Prism.app, signed with the stable Prism identity when available, else ad-hoc.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,6 +18,8 @@ UNIVERSAL=0
 VERSION="${PRISM_VERSION:-0.1.0}"
 BUILD="${PRISM_BUILD:-0}"
 OUT=dist
+SIGN_IDENTITY="${PRISM_SIGN_IDENTITY:-}"
+SIGN_KEYCHAIN="${PRISM_SIGN_KEYCHAIN:-}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --release) CONFIG=release ;;
@@ -23,7 +27,8 @@ while [[ $# -gt 0 ]]; do
     --version) VERSION="$2"; shift ;;
     --build) BUILD="$2"; shift ;;
     --out) OUT="$2"; shift ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    --sign-identity) SIGN_IDENTITY="$2"; shift ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "build_app.sh: unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -77,9 +82,19 @@ if [[ -f "$ICON_SRC" ]]; then
   iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 fi
 
-echo "==> Signing (ad-hoc)"
-codesign --force --deep --sign - --timestamp=none "$APP"
+if [[ -n "$SIGN_IDENTITY" ]] && security find-identity -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | grep -q "$SIGN_IDENTITY"; then
+  echo "==> Signing ($SIGN_IDENTITY)"
+  if ! codesign --force --deep --sign "$SIGN_IDENTITY" ${SIGN_KEYCHAIN:+--keychain "$SIGN_KEYCHAIN"} --timestamp=none "$APP"; then
+    echo "warning: signing with '$SIGN_IDENTITY' failed; falling back to ad-hoc" >&2
+    codesign --force --deep --sign - --timestamp=none "$APP"
+  fi
+else
+  [[ -n "$SIGN_IDENTITY" ]] && echo "warning: identity '$SIGN_IDENTITY' not found; signing ad-hoc" >&2
+  echo "==> Signing (ad-hoc)"
+  codesign --force --deep --sign - --timestamp=none "$APP"
+fi
 codesign --verify --deep --strict "$APP"
+codesign -d -r- "$APP" 2>&1 | grep -i "designated" || true
 
 echo "==> Built $APP"
 lipo -info "$APP/Contents/MacOS/Prism" || true

@@ -52,8 +52,10 @@ scripts/ci-wait.sh agent/<name>     # blocks until done; prints errors; exit 0 =
 critically: alignment, spacing, contrast, clipped text, empty states, beauty.
 
 Screenshot facts:
-- The runner display is 1024×768 pt, so the 1440 pt window overhangs both edges and captures
-  come out about 1440×732.
+- The runner display is 1024×768 pt. The tour window is 1440 pt wide, so the tour captures it in
+  display-wide tiles and stitches them: screenshots show the **whole** window width (about
+  1440×732; the height is limited by the display). White bands at the edges would mean a capture
+  problem, not your layout — tell the orchestrator.
 - Captures come from the window server, so glass and vibrancy render correctly.
 - `tour.log` lists each scene and its capture method.
 - The CI log (`gh run view --log-failed`, or the job log) includes the app's launch log. Look
