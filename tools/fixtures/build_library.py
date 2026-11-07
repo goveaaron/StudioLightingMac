@@ -582,15 +582,66 @@ def qlc_channel_spec(ch_elem):
     if fine:
         spec["fine"] = True
     if default_val != 0:
-        spec["defaultValue"] = default_val
+        spec["default"] = default_val
     if phys_range:
         spec["physical"] = phys_range
     if len(caps_out) > 1 or (len(caps_out) == 1 and kind in ("strobe", "shutter", "effect", "control", "colorMacro")):
         # Keep capabilities compact (strip transient 'kind' helper)
-        spec["capabilities"] = [{"name": c["name"], "range": c["range"]} for c in caps_out[:32]]
+        spec["capabilities"] = [{"label": c["name"], "range": c["range"]} for c in caps_out[:32]]
     if kind in ("control", "effect", "effectSpeed", "panTiltSpeed", "fan"):
         spec["advanced"] = True
     return spec
+
+
+FINE_WORDS = re.compile(r"\bfine\b|\blsb\b|16\s*-?\s*bits?\b|\blow\s*byte\b|\(f\)", re.I)
+LABEL_NOISE = {"fine", "lsb", "bit", "bits", "the", "and", "of", "ch", "channel", "byte", "low"}
+
+
+def _label_words(text):
+    return {w for w in re.findall(r"[a-z]+", (text or "").lower()) if w not in LABEL_NOISE and len(w) > 1}
+
+
+def repair_qlc_fine_channels(ch_list):
+    """Fix QLC+ fine (LSB) flags the Prism renderer could never honour.
+
+    Prism drives a fine channel only when it directly follows a coarse channel of the same
+    kind and cell. Some QLC+ profiles flag ordinary channels as fine ("Auto Program" with
+    Byte=1, "Blue Fine" in a profile with no Blue) or file a fine channel in the wrong group
+    ("Tilt Fine" in the Pan group). Unrepaired, those channels would sit at 0 forever.
+    Returns the number of channels changed.
+    """
+    changed = 0
+    for i, ch in enumerate(ch_list):
+        if not ch.get("fine"):
+            continue
+        prev = ch_list[i - 1] if i > 0 else None
+        same_role = prev is not None and prev.get("kind") == ch.get("kind") and prev.get("cell") == ch.get("cell")
+        if same_role and not prev.get("fine"):
+            continue  # correctly paired with the coarse channel before it
+        label = ch.get("name", "")
+        if same_role:
+            continue  # extra precision byte (24-bit); harmless, stays at its default
+        if not FINE_WORDS.search(label):
+            ch.pop("fine", None)  # an ordinary channel mis-flagged as fine
+            changed += 1
+            continue
+        if prev is not None and not prev.get("fine"):
+            words, prev_words = _label_words(label), _label_words(prev.get("name", ""))
+            if not words or words & prev_words:
+                # "Tilt Fine" filed under Pan right after "Tilt": follow the coarse channel.
+                ch["kind"] = prev.get("kind")
+                if "cell" in prev:
+                    ch["cell"] = prev["cell"]
+                else:
+                    ch.pop("cell", None)
+                changed += 1
+                continue
+        has_coarse = any(not c.get("fine") and c.get("kind") == ch.get("kind") and c.get("cell") == ch.get("cell")
+                         for c in ch_list)
+        if not has_coarse:
+            ch.pop("fine", None)  # "Blue Fine" with no Blue channel: it is the Blue channel
+            changed += 1
+    return changed
 
 
 def qlc_category(qtype, model_name, all_kinds, phys):
@@ -733,6 +784,7 @@ def convert_all_qlc(qlc_root, out_root, seen_models):
                 ch_list.append(ch_copy)
                 all_kinds.add(ch_copy["kind"])
 
+            stats["repaired_fine"] = stats.get("repaired_fine", 0) + repair_qlc_fine_channels(ch_list)
             mode_obj = {
                 "name": mname,
                 "channels": ch_list,

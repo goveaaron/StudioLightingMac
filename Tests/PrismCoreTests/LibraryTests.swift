@@ -197,6 +197,7 @@ final class LibraryTests: XCTestCase {
         var issues: [String] = []
         var curatedWarnings: [String] = []
         var convertedWarnings = 0
+        var convertedDefaults = 0, labelledCapabilities = 0, unlabelledCapabilities = 0
         let safety = SafetySettings()
         let states: [FixtureState] = [
             FixtureState(intensity: 0.75, color: .rgb(RGB(r: 0.2, g: 0.8, b: 0.9))),
@@ -218,6 +219,14 @@ final class LibraryTests: XCTestCase {
             issues += validation.issues
             if entry.source == "curated" || entry.source == "generic" { curatedWarnings += validation.warnings }
             convertedWarnings += entry.source == "curated" || entry.source == "generic" ? 0 : validation.warnings.count
+            for mode in def.modes {
+                for channel in mode.channels {
+                    if entry.source == "ofl" || entry.source == "qlcplus", channel.defaultValue != 0 { convertedDefaults += 1 }
+                    for cap in channel.capabilities ?? [] {
+                        if cap.label.isEmpty { unlabelledCapabilities += 1 } else { labelledCapabilities += 1 }
+                    }
+                }
+            }
 
             // Every mode of this definition patched side by side (one universe each), rendered
             // through the real engine path.
@@ -248,12 +257,19 @@ final class LibraryTests: XCTestCase {
         }
 
         XCTAssertTrue(issues.isEmpty, "\(issues.count) validation issues, e.g.:\n" + issues.prefix(25).joined(separator: "\n"))
+        XCTAssertTrue(curatedWarnings.isEmpty, "Curated/generic profiles must be warning-free:\n" + curatedWarnings.prefix(25).joined(separator: "\n"))
         XCTAssertGreaterThanOrEqual(curatedCount, 90, "Expected >= 90 curated fixtures, got \(curatedCount)")
         XCTAssertGreaterThanOrEqual(oflCount, 600, "Expected >= 600 OFL fixtures, got \(oflCount)")
         XCTAssertGreaterThanOrEqual(qlcCount, 1500, "Expected >= 1500 QLC+ fixtures, got \(qlcCount)")
         XCTAssertGreaterThanOrEqual(totalModesRendered, 6000, "Expected >= 6000 total modes rendered, got \(totalModesRendered)")
         XCTAssertGreaterThan(footprintsChecked, 2000)
-        print("Whole library: \(entries.count) fixtures, \(totalModesRendered) modes rendered, \(footprintsChecked) footprints checked")
+        // Power-on defaults (shutter open, neutral tint…) and capability names must survive conversion.
+        XCTAssertGreaterThan(convertedDefaults, 3000, "Converted channels lost their default values")
+        XCTAssertGreaterThan(labelledCapabilities, 0)
+        XCTAssertLessThan(unlabelledCapabilities * 50, labelledCapabilities, "Too many capabilities without a label")
+        print("Whole library: \(entries.count) fixtures, \(totalModesRendered) modes rendered, \(footprintsChecked) footprints checked, " +
+              "\(convertedWarnings) warnings in converted profiles, \(convertedDefaults) converted defaults, " +
+              "\(labelledCapabilities) labelled / \(unlabelledCapabilities) unlabelled capabilities")
     }
 
     // MARK: - 3. Curated Aputure / amaran & Film/TV Golden Tests

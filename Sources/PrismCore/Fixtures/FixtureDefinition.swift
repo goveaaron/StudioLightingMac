@@ -281,7 +281,7 @@ public struct ChannelCapability: Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case range, dmx, label, tag, kind, physical, value, from, to
+        case range, dmx, label, name, tag, kind, physical, value, from, to
     }
 
     public init(from decoder: Decoder) throws {
@@ -291,7 +291,9 @@ public struct ChannelCapability: Codable, Hashable, Sendable {
             ?? [0, 255]
         from = clamp(range.first ?? 0, 0, 255)
         to = clamp(range.count > 1 ? range[1] : from, from, 255)
-        label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
+        label = (try? c.decodeIfPresent(String.self, forKey: .label))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .name))
+            ?? ""
         tag = try c.decodeIfPresent(String.self, forKey: .tag)
             ?? (try c.decodeIfPresent(String.self, forKey: .kind))
         if let p = try c.decodeIfPresent([Double].self, forKey: .physical) {
@@ -353,6 +355,8 @@ public struct ChannelDefinition: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case kind, fine, coarse, cell, label, name, def
         case defaultValue = "default", highlightValue = "highlight"
+        /// Long spelling accepted on input only (some converters and hand-written files use it).
+        case defaultValueLong = "defaultValue"
         case physical, range, capabilities, advanced, emitter
     }
 
@@ -387,7 +391,11 @@ public struct ChannelDefinition: Codable, Hashable, Sendable {
             fine: isFine,
             cell: decodedCell,
             label: decodedLabel,
-            defaultValue: UInt8(clamp((try? c.decodeIfPresent(Int.self, forKey: .defaultValue)) ?? 0, 0, 255)),
+            defaultValue: UInt8(clamp(
+                (try? c.decodeIfPresent(Int.self, forKey: .defaultValue))
+                    ?? (try? c.decodeIfPresent(Int.self, forKey: .defaultValueLong))
+                    ?? 0,
+                0, 255)),
             highlightValue: (try? c.decodeIfPresent(Int.self, forKey: .highlightValue)).map { UInt8(clamp($0, 0, 255)) },
             physical: phys,
             capabilities: caps,
@@ -1276,13 +1284,17 @@ extension FixtureDefinition {
     /// Checks every mode.
     ///
     /// Issues: no modes; 0 or more than 512 channels (the footprint is exactly the channel
-    /// list); duplicate mode names; a fine (LSB) channel without a coarse channel of the same
-    /// kind and cell before it.
+    /// list); duplicate mode names; a fine (LSB) channel with no coarse channel of the same
+    /// kind and cell anywhere in the mode (it would never be driven).
     ///
-    /// Warnings: a role claimed twice for the same cell (two "pan" channels, a second "red"
-    /// without a pixel number). Both channels then follow the same control, which is what
-    /// multi-zone fixtures without pixel numbering expect, but a hand-made profile with this is
-    /// usually a mistake.
+    /// Warnings:
+    /// - a fine channel that does not directly follow its coarse channel (or the previous
+    ///   precision byte of a 24-bit control). The renderer only writes a fine byte right after
+    ///   its coarse partner, so such a channel stays at its default and the control is 8-bit.
+    /// - a role claimed twice for the same cell (two "pan" channels, a second "red" without a
+    ///   pixel number). Both channels then follow the same control, which is what multi-zone
+    ///   fixtures without pixel numbering expect, but a hand-made profile with this is usually
+    ///   a mistake.
     public func validate() -> Validation {
         struct Role: Hashable { let kind: ChannelKind; let cell: Int? }
         var result = Validation()
@@ -1294,20 +1306,23 @@ extension FixtureDefinition {
             if mode.channelCount < 1 || mode.channelCount > 512 {
                 result.issues.append("\(place): \(mode.channelCount) channels (must be 1–512)")
             }
-            var coarse: [Role: Int] = [:]
-            var fine: [Role: Int] = [:]
-            for (index, channel) in mode.channels.enumerated() {
+            let channels = mode.channels
+            let coarseRoles = Set(channels.filter { !$0.fine }.map { Role(kind: $0.kind, cell: $0.cell) })
+            var coarseCount: [Role: Int] = [:]
+            for (index, channel) in channels.enumerated() {
                 let role = Role(kind: channel.kind, cell: channel.cell)
                 let cellText = channel.cell.map { " (cell \($0 + 1))" } ?? ""
                 if channel.fine {
-                    let pairs = fine[role, default: 0]
-                    if pairs >= coarse[role, default: 0] {
-                        result.issues.append("\(place): fine channel \(index + 1) (\(channel.kind.rawValue)\(cellText)) has no coarse channel before it")
+                    if !coarseRoles.contains(role) {
+                        result.issues.append("\(place): fine channel \(index + 1) (\(channel.kind.rawValue)\(cellText)) has no coarse channel")
+                    } else if index == 0
+                                || channels[index - 1].kind != channel.kind
+                                || channels[index - 1].cell != channel.cell {
+                        result.warnings.append("\(place): fine channel \(index + 1) (\(channel.kind.rawValue)\(cellText)) is not next to its coarse channel")
                     }
-                    fine[role] = pairs + 1
                 } else {
-                    let count = coarse[role, default: 0] + 1
-                    coarse[role] = count
+                    let count = coarseCount[role, default: 0] + 1
+                    coarseCount[role] = count
                     if count > 1, channel.kind.isUniqueRole {
                         result.warnings.append("\(place): channel \(index + 1) repeats \(channel.kind.rawValue)\(cellText)")
                     }
