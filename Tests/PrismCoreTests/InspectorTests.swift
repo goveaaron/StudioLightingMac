@@ -256,8 +256,9 @@ final class InspectorTests: XCTestCase {
 
         let dark = ColorFieldValues(.rgb(RGB(r255: 0, g255: 122, b255: 115)))
         XCTAssertTrue(dark.isDarkStoredColor)
-        XCTAssertEqual(dark.matchingIntensity ?? 0, ColorMath.srgbToLinear(122.0 / 255), accuracy: 1e-9)
-        XCTAssertNil(teal.matchingIntensity)
+        XCTAssertEqual(dark.matchingIntensity() ?? 0, ColorMath.srgbToLinear(122.0 / 255), accuracy: 1e-9)
+        XCTAssertEqual(dark.matchingIntensity(accurateColor: false) ?? 0, 122.0 / 255, accuracy: 1e-9)
+        XCTAssertNil(teal.matchingIntensity())
         XCTAssertEqual(ColorModeKind(.xy(x: 0.3, y: 0.3)), .xy)
     }
 

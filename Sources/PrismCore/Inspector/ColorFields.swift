@@ -20,7 +20,7 @@ public enum ColorModeKind: String, Sendable, Hashable, CaseIterable {
     /// Plain-English name for UI copy.
     public var displayName: String {
         switch self {
-        case .color: return "Colour"
+        case .color: return "Color"
         case .white: return "White"
         case .xy: return "CIE xy"
         }
@@ -103,11 +103,13 @@ public struct ColorFieldValues: Sendable, Hashable {
     /// the brightness slider. Everyday colours such as `#00C2B8` (V 0.76) don't trigger it.
     public var isDarkStoredColor: Bool { isHexExact && value < 0.6 && value > 0.0005 }
 
-    /// For a dark stored RGB colour, the brightness (linear light output) that reproduces the
-    /// hex's darkness on a light — `#007A73` → about 19.6% — else `nil`.
-    public var matchingIntensity: Double? {
+    /// For a dark stored RGB colour, the brightness that reproduces the hex's darkness on a
+    /// light, else `nil`. With accurate (photometric) colour — the default — that's the hex's
+    /// value in linear light (`#007A73` → about 19.6%); in direct "console" mode the bytes are
+    /// sent as-is, so it's the plain value (≈ 47.8%).
+    public func matchingIntensity(accurateColor: Bool = true) -> Double? {
         guard isDarkStoredColor else { return nil }
-        return clamp01(ColorMath.srgbToLinear(value))
+        return clamp01(accurateColor ? ColorMath.srgbToLinear(value) : value)
     }
 }
 
@@ -237,7 +239,7 @@ public enum InspectorFixtureKind: String, Sendable, Hashable {
         switch self {
         case .dimmerOnly: return "Brightness only"
         case .whiteOnly: return "Tunable white"
-        case .color: return "Colour"
+        case .color: return "Color"
         case .pixel: return "Pixels"
         }
     }
