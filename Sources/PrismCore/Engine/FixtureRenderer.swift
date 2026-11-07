@@ -296,7 +296,9 @@ public enum FixtureRenderer {
                     fraction = 0
                 } else {
                     let rawK = ctx.useNativeWhite ? ctx.kelvin : (ctx.color.isWhiteish ? ctx.kelvin : 5600)
-                    let trimmedK = clamp(rawK + calibration.whitePointKelvinTrim.finiteOr(0), 1700, 20000)
+                    let loK = limits.minKelvin ?? 1700
+                    let hiK = max(loK, limits.maxKelvin ?? 20000)
+                    let trimmedK = clamp(rawK + calibration.whitePointKelvinTrim.finiteOr(0), loK, hiK)
                     if let p = ch.physical {
                         fraction = p.fraction(for: trimmedK)
                     } else {
