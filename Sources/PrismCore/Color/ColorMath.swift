@@ -175,9 +175,75 @@ public enum ColorMath {
         uvToXY(uPrime, vPrime / 1.5)
     }
 
+    /// Planckian locus sampled in CIE 1960 (u, v) at 1-mired steps from 40 mired (25000 K) to
+    /// 600 mired (1667 K), interleaved as `[u0, v0, u1, v1, …]`. Built once, read-only afterwards.
+    private static let locusUVTable: [Double] = {
+        var table: [Double] = []
+        table.reserveCapacity(2 * 561)
+        for i in 0..<561 {
+            let p = planckianXY(1_000_000.0 / (40.0 + Double(i)))
+            let uv = xyToUV(p.x, p.y)
+            table.append(uv.u)
+            table.append(uv.v)
+        }
+        return table
+    }()
+
     /// CCT and signed Duv for a chromaticity in CIE 1931 xy.
     /// Positive Duv is above the Planckian locus (greener); negative Duv is below (more magenta).
+    ///
+    /// Real-time safe: a coarse + local scan of a precomputed 1-mired locus table, parabolic
+    /// refinement (≈ 0.001 mired), then one exact locus/normal evaluation for Duv. Agrees with the
+    /// exhaustive search (`xyToKelvinAndDuvReference`) to well under 1 K and 1e-5 Duv near the locus.
     public static func xyToKelvinAndDuv(x: Double, y: Double) -> (kelvin: Double, duv: Double) {
+        guard x.isFinite, y.isFinite else { return (5600, 0) }
+        let (u, v) = xyToUV(x, y)
+        let mired: Double = locusUVTable.withUnsafeBufferPointer { t -> Double in
+            let n = t.count / 2
+            guard n > 2 else { return 1_000_000.0 / 5600.0 }
+            @inline(__always)
+            func dist2(_ i: Int) -> Double {
+                let du = u - t[2 * i], dv = v - t[2 * i + 1]
+                return du * du + dv * dv
+            }
+            var best = 0
+            var bestD = Double.infinity
+            var i = 0
+            while i < n {
+                let d = dist2(i)
+                if d < bestD { bestD = d; best = i }
+                i += 8
+            }
+            let last = dist2(n - 1)
+            if last < bestD { bestD = last; best = n - 1 }
+            var j = max(0, best - 8)
+            let hi = min(n - 1, best + 8)
+            while j <= hi {
+                let d = dist2(j)
+                if d < bestD { bestD = d; best = j }
+                j += 1
+            }
+            var m = 40.0 + Double(best)
+            if best > 0 && best < n - 1 {
+                let fm = dist2(best - 1), fp = dist2(best + 1)
+                let denom = fm - 2 * bestD + fp
+                if denom > 1e-30 {
+                    m += clamp(0.5 * (fm - fp) / denom, -0.5, 0.5)
+                }
+            }
+            return m
+        }
+        let kelvin = clamp(1_000_000.0 / mired, 1000, 25000)
+        let locus = planckianXY(kelvin)
+        let (ul, vl) = xyToUV(locus.x, locus.y)
+        let (nu, nv) = planckianUVNormal(kelvin)
+        let duv = (u - ul) * nu + (v - vl) * nv
+        return (kelvin, duv)
+    }
+
+    /// Exhaustive reference CCT search (281-point scan + golden-section refinement on the exact
+    /// locus). Too slow for the render loop; kept to validate `xyToKelvinAndDuv` in tests.
+    static func xyToKelvinAndDuvReference(x: Double, y: Double) -> (kelvin: Double, duv: Double) {
         guard x.isFinite, y.isFinite else { return (5600, 0) }
         let (u, v) = xyToUV(x, y)
         @inline(__always)
@@ -218,8 +284,8 @@ public enum ColorMath {
     }
 
     /// CCT and tint for a chromaticity: finds the closest point on the Planckian locus in
-    /// CIE 1960 uv (coarse scan in mired space + golden-section refinement), then derives the
-    /// signed Duv (positive = above the locus = greener) and maps it to tint (−1…+1).
+    /// CIE 1960 uv (table scan in mired space + parabolic refinement, see `xyToKelvinAndDuv`), then
+    /// derives the signed Duv (positive = above the locus = greener) and maps it to tint (−1…+1).
     public static func xyToKelvinAndTint(x: Double, y: Double) -> (kelvin: Double, tint: Double) {
         let (kelvin, duv) = xyToKelvinAndDuv(x: x, y: y)
         return (kelvin, duvToTint(duv))

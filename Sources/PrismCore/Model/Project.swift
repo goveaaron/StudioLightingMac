@@ -286,6 +286,9 @@ public struct Project: Codable, Hashable, Sendable {
     /// Fixture definitions used by this project, embedded for portability.
     public var definitions: [FixtureDefinition]
     public var musicDefaults: MusicModeSettings
+    /// Default color mixing mode for every fixture (Accurate or Direct). Each fixture can
+    /// override it with `ColorCalibration.mixingMode`.
+    public var colorMixingMode: ColorMixingMode = .accurate
     public var lastLive: LiveSnapshot?
     public var notes: String
     public var createdAt: Date
@@ -299,17 +302,19 @@ public struct Project: Codable, Hashable, Sendable {
                 looks: [Look] = [], folders: [LookFolder] = [], stage: StageSettings = StageSettings(),
                 definitions: [FixtureDefinition] = [], musicDefaults: MusicModeSettings = MusicModeSettings(),
                 lastLive: LiveSnapshot? = nil, notes: String = "", createdAt: Date = Date(), modifiedAt: Date = Date(),
-                appVersion: String? = nil, formatVersion: Int = Project.currentFormatVersion) {
+                appVersion: String? = nil, formatVersion: Int = Project.currentFormatVersion,
+                colorMixingMode: ColorMixingMode = .accurate) {
         self.formatVersion = formatVersion
         self.id = id; self.name = name; self.fixtures = fixtures; self.groups = groups; self.looks = looks
         self.folders = folders; self.stage = stage; self.definitions = definitions; self.musicDefaults = musicDefaults
         self.lastLive = lastLive; self.notes = notes; self.createdAt = createdAt; self.modifiedAt = modifiedAt
         self.appVersion = appVersion
+        self.colorMixingMode = colorMixingMode
     }
 
     private enum CodingKeys: String, CodingKey {
         case formatVersion, version, id, name, fixtures, groups, looks, folders, stage, definitions, musicDefaults,
-             lastLive, notes, createdAt, modifiedAt, appVersion
+             lastLive, notes, createdAt, modifiedAt, appVersion, colorMixingMode
     }
 
     public init(from decoder: Decoder) throws {
@@ -395,6 +400,9 @@ public struct Project: Codable, Hashable, Sendable {
         createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? Date()
         modifiedAt = (try? c.decodeIfPresent(Date.self, forKey: .modifiedAt)) ?? Date()
         appVersion = try? c.decodeIfPresent(String.self, forKey: .appVersion)
+        if let mode = try? c.decodeIfPresent(ColorMixingMode.self, forKey: .colorMixingMode) {
+            colorMixingMode = mode
+        }
         decodeFixes = fixes
     }
 
@@ -415,6 +423,9 @@ public struct Project: Codable, Hashable, Sendable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encode(modifiedAt, forKey: .modifiedAt)
         try c.encodeIfPresent(appVersion, forKey: .appVersion)
+        if colorMixingMode != .accurate {
+            try c.encode(colorMixingMode, forKey: .colorMixingMode)
+        }
     }
 
     public static func == (lhs: Project, rhs: Project) -> Bool {
@@ -432,7 +443,8 @@ public struct Project: Codable, Hashable, Sendable {
         lhs.notes == rhs.notes &&
         lhs.createdAt == rhs.createdAt &&
         lhs.modifiedAt == rhs.modifiedAt &&
-        lhs.appVersion == rhs.appVersion
+        lhs.appVersion == rhs.appVersion &&
+        lhs.colorMixingMode == rhs.colorMixingMode
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -451,6 +463,7 @@ public struct Project: Codable, Hashable, Sendable {
         hasher.combine(createdAt)
         hasher.combine(modifiedAt)
         hasher.combine(appVersion)
+        hasher.combine(colorMixingMode)
     }
 
     // MARK: Lookups
@@ -466,7 +479,9 @@ public struct Project: Codable, Hashable, Sendable {
         fixtures.compactMap { f in
             guard let def = definition(f.definitionID) ?? library?(f.definitionID),
                   let mode = def.mode(named: f.modeName) ?? def.recommendedMode else { return nil }
-            return ResolvedFixture(fixture: f, definition: def, mode: mode)
+            var rf = ResolvedFixture(fixture: f, definition: def, mode: mode)
+            rf.defaultMixingMode = colorMixingMode
+            return rf
         }
     }
 }

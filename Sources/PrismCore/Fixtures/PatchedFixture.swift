@@ -249,9 +249,16 @@ public struct ColorCalibration: Codable, Hashable, Sendable {
     public var gamma: Double
     /// Per-emitter gain trims (e.g. reduce a too-strong green), keyed by ChannelKind raw value.
     public var gains: [String: Double]
+    /// Per-fixture color mixing mode override; `nil` uses the project default
+    /// (`Project.colorMixingMode`).
+    public var mixingMode: ColorMixingMode?
     /// How hex colors are converted: true = photometrically accurate (decode sRGB gamma);
-    /// false = send hex bytes directly like most consoles.
-    public var accurateColor: Bool
+    /// false = send hex bytes directly like most consoles. Compatibility view of `mixingMode`
+    /// (setting it stores an explicit override).
+    public var accurateColor: Bool {
+        get { mixingMode != .direct }
+        set { mixingMode = newValue ? .accurate : .direct }
+    }
     /// White-point Kelvin trim (e.g. `+150` or `-200` K) applied to match fixtures across brands.
     public var whitePointKelvinTrim: Double
     /// White-point green/magenta tint trim (`-1…+1`, negative = greener, positive = more magenta).
@@ -259,31 +266,41 @@ public struct ColorCalibration: Codable, Hashable, Sendable {
     /// Optional per-fixture dimmer curve override.
     public var dimmerCurve: DimmerCurve?
 
+    /// - Parameters:
+    ///   - accurateColor: legacy switch (`true` = Accurate, `false` = Direct); `nil` = project default.
+    ///   - mixingMode: explicit mixing mode override; wins over `accurateColor`.
     public init(
         gamma: Double = 1,
         gains: [String: Double] = [:],
-        accurateColor: Bool = true,
+        accurateColor: Bool? = nil,
         whitePointKelvinTrim: Double = 0,
         whitePointTintTrim: Double = 0,
-        dimmerCurve: DimmerCurve? = nil
+        dimmerCurve: DimmerCurve? = nil,
+        mixingMode: ColorMixingMode? = nil
     ) {
         self.gamma = gamma
         self.gains = gains
-        self.accurateColor = accurateColor
+        self.mixingMode = mixingMode ?? accurateColor.map { $0 ? ColorMixingMode.accurate : .direct }
         self.whitePointKelvinTrim = whitePointKelvinTrim
         self.whitePointTintTrim = whitePointTintTrim
         self.dimmerCurve = dimmerCurve
     }
 
     private enum CodingKeys: String, CodingKey {
-        case gamma, gains, accurateColor, whitePointKelvinTrim, whitePointTintTrim, dimmerCurve
+        case gamma, gains, mixingMode, accurateColor, whitePointKelvinTrim, whitePointTintTrim, dimmerCurve
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         gamma = (try c.decodeIfPresent(Double.self, forKey: .gamma) ?? 1).finiteOr(1)
         gains = try c.decodeIfPresent([String: Double].self, forKey: .gains) ?? [:]
-        accurateColor = try c.decodeIfPresent(Bool.self, forKey: .accurateColor) ?? true
+        if let mode = try? c.decodeIfPresent(ColorMixingMode.self, forKey: .mixingMode) {
+            mixingMode = mode
+        } else if let accurate = try? c.decodeIfPresent(Bool.self, forKey: .accurateColor), !accurate {
+            mixingMode = .direct // legacy files: `accurateColor: false`
+        } else {
+            mixingMode = nil
+        }
         whitePointKelvinTrim = (try c.decodeIfPresent(Double.self, forKey: .whitePointKelvinTrim) ?? 0).finiteOr(0)
         whitePointTintTrim = clamp((try c.decodeIfPresent(Double.self, forKey: .whitePointTintTrim) ?? 0).finiteOr(0), -1, 1)
         dimmerCurve = try c.decodeIfPresent(DimmerCurve.self, forKey: .dimmerCurve)
@@ -293,7 +310,11 @@ public struct ColorCalibration: Codable, Hashable, Sendable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(gamma, forKey: .gamma)
         try c.encode(gains, forKey: .gains)
-        try c.encode(accurateColor, forKey: .accurateColor)
+        try c.encodeIfPresent(mixingMode, forKey: .mixingMode)
+        if mixingMode == .direct {
+            // Keeps Direct working when an older build opens the file.
+            try c.encode(false, forKey: .accurateColor)
+        }
         if abs(whitePointKelvinTrim) > 1e-6 {
             try c.encode(whitePointKelvinTrim, forKey: .whitePointKelvinTrim)
         }
@@ -410,6 +431,12 @@ public struct ResolvedFixture: Sendable, Identifiable {
     public var capabilities: ColorCapabilities { mode.capabilities }
     public var channelCount: Int { mode.channelCount }
     public var cellCount: Int { mode.cellCount }
+
+    /// Project-wide default color mixing mode (`Project.colorMixingMode`), filled in by
+    /// `Project.resolvedFixtures(library:)`.
+    public var defaultMixingMode: ColorMixingMode = .accurate
+    /// Effective color mixing mode: the fixture's override, else the project default.
+    public var mixingMode: ColorMixingMode { fixture.calibration.mixingMode ?? defaultMixingMode }
 
     /// DMX address range occupied (1-based, inclusive), nil when unpatched.
     public var addressRange: ClosedRange<Int>? {

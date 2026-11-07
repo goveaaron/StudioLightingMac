@@ -80,6 +80,7 @@ public struct FixtureState: Codable, Hashable, Sendable {
         let t = clamp01(t.finiteOr(0))
         if t <= 0 { return a }
         if t >= 1 { return b }
+        if a == b { return a }
         var out = FixtureState(
             intensity: mixIntensity(a.intensity, b.intensity, t),
             color: LightColor.mix(a.color, b.color, t),

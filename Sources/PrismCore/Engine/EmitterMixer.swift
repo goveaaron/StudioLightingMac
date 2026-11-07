@@ -89,6 +89,24 @@ public struct EmitterLevels: Sendable, Hashable {
         indigo *= inv
     }
 
+    /// Multiplies every level by the matching level of `gains` (per-emitter calibration trims).
+    @inline(__always)
+    public mutating func multiply(by gains: EmitterLevels) {
+        red *= gains.red
+        green *= gains.green
+        blue *= gains.blue
+        white *= gains.white
+        warmWhite *= gains.warmWhite
+        coolWhite *= gains.coolWhite
+        amber *= gains.amber
+        lime *= gains.lime
+        cyan *= gains.cyan
+        magenta *= gains.magenta
+        yellow *= gains.yellow
+        uv *= gains.uv
+        indigo *= gains.indigo
+    }
+
     public func toDictionary(for emitters: Set<ChannelKind>) -> [ChannelKind: Double] {
         var out: [ChannelKind: Double] = [:]
         out.reserveCapacity(emitters.count)
@@ -96,6 +114,40 @@ public struct EmitterLevels: Sendable, Hashable {
             out[kind] = self[kind]
         }
         return out
+    }
+}
+
+extension EmitterLevels {
+    /// Every level = 1 (identity gains).
+    static let unity: EmitterLevels = {
+        var l = EmitterLevels()
+        for kind in EmitterMixer.allEmitterKinds { l[kind] = 1 }
+        return l
+    }()
+
+    /// Clamps every level to 0…1 (NaN → 0) and, when `applyGamma` is set, raises it to `gamma`.
+    @inline(__always)
+    mutating func clampAndApplyGamma(_ gamma: Double, applyGamma: Bool) {
+        red = EmitterLevels.shape(red, gamma, applyGamma)
+        green = EmitterLevels.shape(green, gamma, applyGamma)
+        blue = EmitterLevels.shape(blue, gamma, applyGamma)
+        white = EmitterLevels.shape(white, gamma, applyGamma)
+        warmWhite = EmitterLevels.shape(warmWhite, gamma, applyGamma)
+        coolWhite = EmitterLevels.shape(coolWhite, gamma, applyGamma)
+        amber = EmitterLevels.shape(amber, gamma, applyGamma)
+        lime = EmitterLevels.shape(lime, gamma, applyGamma)
+        cyan = EmitterLevels.shape(cyan, gamma, applyGamma)
+        magenta = EmitterLevels.shape(magenta, gamma, applyGamma)
+        yellow = EmitterLevels.shape(yellow, gamma, applyGamma)
+        uv = EmitterLevels.shape(uv, gamma, applyGamma)
+        indigo = EmitterLevels.shape(indigo, gamma, applyGamma)
+    }
+
+    @inline(__always)
+    private static func shape(_ v: Double, _ gamma: Double, _ applyGamma: Bool) -> Double {
+        let c = clamp01(v)
+        guard applyGamma, c > 0, c < 1 else { return c }
+        return pow(c, gamma)
     }
 }
 
@@ -150,9 +202,377 @@ public struct EmitterMask: OptionSet, Sendable, Hashable {
     }
 }
 
+// MARK: - Emitter bases and per-definition profiles
+
+/// Linear-light output (sRGB primaries, D65 white) of each emitter kind at full drive.
+struct EmitterBases: Sendable {
+    var red = LinearRGB(r: 1, g: 0, b: 0)
+    var green = LinearRGB(r: 0, g: 1, b: 0)
+    var blue = LinearRGB(r: 0, g: 0, b: 1)
+    var white = EmitterBases.defaultWhite
+    var warmWhite = EmitterBases.defaultWarmWhite
+    var coolWhite = EmitterBases.defaultCoolWhite
+    /// ~590 nm amber LED.
+    var amber = LinearRGB(r: 1.0, g: 0.395, b: 0.0)
+    /// ~555 nm lime (phosphor-converted green-yellow) LED.
+    var lime = LinearRGB(r: 0.505, g: 1.0, b: 0.046)
+    /// ~500 nm cyan LED.
+    var cyan = LinearRGB(r: 0.0, g: 0.85, b: 1.0)
+    var magenta = LinearRGB(r: 1.0, g: 0.075, b: 0.785)
+    var yellow = LinearRGB(r: 0.92, g: 1.0, b: 0.03)
+    var uv = LinearRGB(r: 0.24, g: 0.0, b: 1.0)
+    var indigo = LinearRGB(r: 0.16, g: 0.0, b: 1.0)
+
+    static let defaultWhite = ColorMath.xyToLinearSRGB(x: 0.330, y: 0.340).normalized
+    static let defaultWarmWhite = ColorMath.xyToLinearSRGB(x: 0.460, y: 0.411).normalized
+    static let defaultCoolWhite = ColorMath.xyToLinearSRGB(x: 0.313, y: 0.329).normalized
+
+    static let standard = EmitterBases()
+
+    @inline(__always)
+    subscript(kind: ChannelKind) -> LinearRGB {
+        get {
+            switch kind {
+            case .red: return red
+            case .green: return green
+            case .blue: return blue
+            case .white: return white
+            case .warmWhite: return warmWhite
+            case .coolWhite: return coolWhite
+            case .amber: return amber
+            case .lime: return lime
+            case .cyan: return cyan
+            case .magenta: return magenta
+            case .yellow: return yellow
+            case .uv: return uv
+            case .indigo: return indigo
+            default: return .black
+            }
+        }
+        set {
+            switch kind {
+            case .red: red = newValue
+            case .green: green = newValue
+            case .blue: blue = newValue
+            case .white: white = newValue
+            case .warmWhite: warmWhite = newValue
+            case .coolWhite: coolWhite = newValue
+            case .amber: amber = newValue
+            case .lime: lime = newValue
+            case .cyan: cyan = newValue
+            case .magenta: magenta = newValue
+            case .yellow: yellow = newValue
+            case .uv: uv = newValue
+            case .indigo: indigo = newValue
+            default: break
+            }
+        }
+    }
+}
+
+/// Everything the mixer needs to know about one set of emitters, computed once per distinct
+/// `[ChannelKind: EmitterSpec]` (i.e. once per fixture definition) and shared immutably.
+///
+/// The accurate solver works in a "fixture RGB" space `K = diag(1/g)·M⁻¹`, where `M` holds the
+/// fixture's R/G/B emitters as columns and `g = M⁻¹·(1,1,1)` is the drive needed for D65 white,
+/// so equal amounts of the three primaries are always white. With standard (sRGB) primaries
+/// `K` is the identity and nothing changes.
+final class MixerProfile: Sendable {
+    /// Physical linear-light output of each emitter at full drive (used for NNLS and ΔE checks).
+    let linear: EmitterBases
+    /// Emitter outputs expressed in the solver's fixture-RGB space (`K · linear`).
+    let solver: EmitterBases
+    /// True when the definition supplied its own R, G or B chromaticities.
+    let customPrimaries: Bool
+    /// Rows of `K` (maps linear sRGB into fixture-RGB space).
+    let kRow0: LinearRGB
+    let kRow1: LinearRGB
+    let kRow2: LinearRGB
+    /// Per-primary drive needed for D65 white (fixture-RGB amount × gain = R/G/B drive level).
+    let driveGain: LinearRGB
+    /// Relative luminance of each fixture primary in fixture-RGB space (sums to 1).
+    let lumaWeights: LinearRGB
+    /// Nominal CCT of the warm-white, white and cool-white emitters.
+    let warmWhiteK: Double
+    let whiteK: Double
+    let coolWhiteK: Double
+
+    /// Profile for fixtures without `emitters` specs (sRGB primaries and stock LED bases).
+    static let standard = MixerProfile(specs: nil)
+
+    private static let cache = Locked<[[ChannelKind: EmitterSpec]: MixerProfile]>([:])
+
+    /// The (cached) profile for a definition's emitter specs. `nil` or empty → `standard`.
+    static func profile(for specs: [ChannelKind: EmitterSpec]?) -> MixerProfile {
+        guard let specs, !specs.isEmpty else { return standard }
+        if let hit = cache.mutate({ $0[specs] }) { return hit }
+        let made = MixerProfile(specs: specs)
+        cache.mutate { c in
+            if c.count >= 64 { c.removeAll(keepingCapacity: true) }
+            c[specs] = made
+        }
+        return made
+    }
+
+    private struct ModeKey: Hashable {
+        let definitionID: String
+        let modeName: String
+        let specHash: Int
+    }
+
+    private static let modeCache = Locked<[ModeKey: MixerProfile]>([:])
+
+    /// Profile for a mode whose channels carry their own `emitter` specs (merged over the
+    /// definition's `emitters`). `specHash` must cover the channel specs and the definition's
+    /// specs so edited definitions never reuse a stale profile.
+    static func profile(definition: FixtureDefinition, mode: FixtureMode, specHash: Int) -> MixerProfile {
+        let key = ModeKey(definitionID: definition.id, modeName: mode.name, specHash: specHash)
+        if let hit = modeCache.mutate({ $0[key] }) { return hit }
+        var merged = definition.emitters ?? [:]
+        for ch in mode.channels where ch.kind.isEmitter {
+            if let spec = ch.emitter { merged[ch.kind] = spec }
+        }
+        let made = profile(for: merged)
+        modeCache.mutate { c in
+            if c.count >= 64 { c.removeAll(keepingCapacity: true) }
+            c[key] = made
+        }
+        return made
+    }
+
+    private init(specs: [ChannelKind: EmitterSpec]?) {
+        var lin = EmitterBases.standard
+        var wwK = EmitterMixer.warmWhiteK
+        var wK = 5600.0
+        var cwK = EmitterMixer.coolWhiteK
+        if let specs {
+            for (kind, spec) in specs where kind.isEmitter {
+                if let v = MixerProfile.linearOutput(of: spec) { lin[kind] = v }
+            }
+            wwK = MixerProfile.nominalKelvin(of: specs[.warmWhite], fallback: wwK)
+            wK = MixerProfile.nominalKelvin(of: specs[.white], fallback: wK)
+            cwK = MixerProfile.nominalKelvin(of: specs[.coolWhite], fallback: cwK)
+        }
+        linear = lin
+        warmWhiteK = wwK
+        whiteK = wK
+        coolWhiteK = cwK
+
+        var custom = false
+        var r0 = LinearRGB(r: 1, g: 0, b: 0)
+        var r1 = LinearRGB(r: 0, g: 1, b: 0)
+        var r2 = LinearRGB(r: 0, g: 0, b: 1)
+        var gain = LinearRGB(r: 1, g: 1, b: 1)
+        var luma = LinearRGB(r: 0.2126729, g: 0.7151522, b: 0.0721750)
+        let hasPrimarySpecs = specs.map { $0[.red] != nil || $0[.green] != nil || $0[.blue] != nil } ?? false
+        if hasPrimarySpecs, let inv = MixerProfile.inverseRows(lin.red, lin.green, lin.blue) {
+            let g0 = inv.0.r + inv.0.g + inv.0.b
+            let g1 = inv.1.r + inv.1.g + inv.1.b
+            let g2 = inv.2.r + inv.2.g + inv.2.b
+            if g0 > 1e-6, g1 > 1e-6, g2 > 1e-6, g0.isFinite, g1.isFinite, g2.isFinite {
+                custom = true
+                r0 = inv.0 * (1 / g0)
+                r1 = inv.1 * (1 / g1)
+                r2 = inv.2 * (1 / g2)
+                gain = LinearRGB(r: g0, g: g1, b: g2)
+                let l0 = g0 * lin.red.luminance
+                let l1 = g1 * lin.green.luminance
+                let l2 = g2 * lin.blue.luminance
+                let sum = l0 + l1 + l2
+                if sum > 1e-9, l0 >= 0, l1 >= 0, l2 >= 0 {
+                    luma = LinearRGB(r: l0 / sum, g: l1 / sum, b: l2 / sum)
+                }
+            }
+        }
+        customPrimaries = custom
+        kRow0 = r0
+        kRow1 = r1
+        kRow2 = r2
+        driveGain = gain
+        lumaWeights = luma
+
+        var sol = lin
+        if custom {
+            for kind in EmitterMixer.allEmitterKinds {
+                let v = lin[kind]
+                sol[kind] = LinearRGB(
+                    r: r0.r * v.r + r0.g * v.g + r0.b * v.b,
+                    g: r1.r * v.r + r1.g * v.g + r1.b * v.b,
+                    b: r2.r * v.r + r2.g * v.g + r2.b * v.b
+                )
+            }
+        }
+        solver = sol
+    }
+
+    /// Maps linear sRGB into fixture-RGB space.
+    @inline(__always)
+    func toSolver(_ v: LinearRGB) -> LinearRGB {
+        guard customPrimaries else { return v }
+        return LinearRGB(
+            r: kRow0.r * v.r + kRow0.g * v.g + kRow0.b * v.b,
+            g: kRow1.r * v.r + kRow1.g * v.g + kRow1.b * v.b,
+            b: kRow2.r * v.r + kRow2.g * v.g + kRow2.b * v.b
+        )
+    }
+
+    /// Nominal CCT of a white emitter kind.
+    @inline(__always)
+    func nominalKelvin(of kind: ChannelKind) -> Double {
+        switch kind {
+        case .warmWhite: return warmWhiteK
+        case .coolWhite: return coolWhiteK
+        default: return whiteK
+        }
+    }
+
+    /// Unclamped linear sRGB output of a spec (chromaticity scaled by its lumens), or nil when the
+    /// spec is not physically meaningful.
+    static func linearOutput(of spec: EmitterSpec) -> LinearRGB? {
+        let x = spec.x, y = spec.y, lumens = spec.lumens
+        guard x.isFinite, y.isFinite, lumens.isFinite,
+              x >= 0, y > 0.001, x + y <= 1.0001, lumens > 0 else { return nil }
+        let xyz = ColorMath.xyYToXYZ(x: x, y: y, Y: max(lumens, 0.01))
+        let v = ColorMath.xyzToLinearSRGBUnclamped(X: xyz.X, Y: xyz.Y, Z: xyz.Z)
+        guard v.r.isFinite, v.g.isFinite, v.b.isFinite, v.maxComponent > 1e-9 else { return nil }
+        return v
+    }
+
+    private static func nominalKelvin(of spec: EmitterSpec?, fallback: Double) -> Double {
+        guard let spec else { return fallback }
+        if let k = spec.cctKelvin, k.isFinite, k >= 1000, k <= 25000 { return k }
+        let x = spec.x, y = spec.y
+        guard x.isFinite, y.isFinite, x > 0, y > 0.001, x + y <= 1.0001 else { return fallback }
+        let k = ColorMath.xyToKelvinAndDuv(x: x, y: y).kelvin
+        return k.isFinite && k > 0 ? k : fallback
+    }
+
+    /// Rows of the inverse of the matrix whose columns are `c0`, `c1`, `c2`, or nil if singular.
+    private static func inverseRows(
+        _ c0: LinearRGB, _ c1: LinearRGB, _ c2: LinearRGB
+    ) -> (LinearRGB, LinearRGB, LinearRGB)? {
+        let x12 = cross(c1, c2), x20 = cross(c2, c0), x01 = cross(c0, c1)
+        let det = c0.r * x12.r + c0.g * x12.g + c0.b * x12.b
+        guard det.isFinite, abs(det) > 1e-12 else { return nil }
+        let inv = 1 / det
+        return (x12 * inv, x20 * inv, x01 * inv)
+    }
+
+    @inline(__always)
+    private static func cross(_ a: LinearRGB, _ b: LinearRGB) -> LinearRGB {
+        LinearRGB(r: a.g * b.b - a.b * b.g, g: a.b * b.r - a.r * b.b, b: a.r * b.g - a.g * b.r)
+    }
+}
+
+/// Per-render mixing constants for one fixture: emitter profile, mixing mode and calibration
+/// (per-emitter gains, gamma, white-point trim). Building it is cheap and allocation-free.
+struct MixPlan {
+    let profile: MixerProfile
+    let mode: ColorMixingMode
+    private(set) var gains = EmitterLevels.unity
+    private(set) var hasGains = false
+    private(set) var gamma = 1.0
+    private(set) var hasGamma = false
+    private(set) var kelvinTrim = 0.0
+    private(set) var tintTrim = 0.0
+    private(set) var hasTrim = false
+    /// Channel-wise white-point adaptation applied to non-Kelvin targets when a trim is set.
+    private(set) var adaptation = LinearRGB.white
+
+    /// Linear 5600 K reference white for the white-point trim.
+    private static let trimReference: LinearRGB = {
+        let xy = ColorMath.kelvinToXY(5600, tint: 0)
+        return ColorMath.xyToLinearSRGB(x: xy.x, y: xy.y).normalized
+    }()
+
+    init(profile: MixerProfile, calibration cal: ColorCalibration, mode: ColorMixingMode) {
+        self.profile = profile
+        self.mode = mode
+        for (key, value) in cal.gains {
+            guard let kind = ChannelKind(rawValue: key), kind.isEmitter else { continue }
+            let g = value.isFinite ? max(0, value) : 1
+            if abs(g - 1) > 1e-9 {
+                gains[kind] = g
+                hasGains = true
+            }
+        }
+        let gm = cal.gamma.isFinite ? clamp(cal.gamma, 0.1, 10) : 1
+        gamma = gm
+        hasGamma = abs(gm - 1) > 1e-9
+        kelvinTrim = clamp(cal.whitePointKelvinTrim.finiteOr(0), -10_000, 10_000)
+        tintTrim = clamp(cal.whitePointTintTrim.finiteOr(0), -1, 1)
+        hasTrim = abs(kelvinTrim) > 1e-6 || abs(tintTrim) > 1e-6
+        if hasTrim {
+            let ref = MixPlan.trimReference
+            let xy = ColorMath.kelvinToXY(clamp(5600 + kelvinTrim, 1700, 20000), tint: tintTrim)
+            let shifted = ColorMath.xyToLinearSRGB(x: xy.x, y: xy.y).normalized
+            adaptation = LinearRGB(
+                r: shifted.r / max(ref.r, 0.05),
+                g: shifted.g / max(ref.g, 0.05),
+                b: shifted.b / max(ref.b, 0.05)
+            )
+        }
+    }
+
+    /// Applies the white-point trim to `.kelvin` colours. Other colours are adapted in `levels`.
+    @inline(__always)
+    func trimmed(_ color: LightColor) -> LightColor {
+        guard hasTrim, case .kelvin(let k, let t) = color else { return color }
+        return .kelvin(
+            clamp(k.finiteOr(5600) + kelvinTrim, 1000, 25000),
+            tint: clamp(t.finiteOr(0) + tintTrim, -1, 1)
+        )
+    }
+
+    /// Emitter levels (0…1, calibrated) for an already-trimmed colour and its analysis.
+    func levels(for color: LightColor, analysis a: ColorAnalysis, emitters: EmitterMask) -> EmitterLevels {
+        guard !emitters.isEmpty, !a.isBlack else { return EmitterLevels() }
+        var isKelvin = false
+        var kelvin = 5600.0
+        if case .kelvin(let k, _) = color {
+            isKelvin = true
+            kelvin = k
+        }
+        var target = a.linear
+        if hasTrim, !isKelvin {
+            target = LinearRGB(
+                r: target.r * adaptation.r,
+                g: target.g * adaptation.g,
+                b: target.b * adaptation.b
+            ).normalized
+        }
+        let whitesOnly = !emitters.isSuperset(of: .rgb) && emitters.isSubset(of: EmitterMixer.whiteEmitters)
+        if whitesOnly, !isKelvin {
+            let full = a.hasCCT ? a : ColorAnalysis.of(color, includeCCT: true)
+            kelvin = full.kelvin + kelvinTrim
+        }
+        let solved = EmitterMixer.solve(
+            target: target, color: color, analysis: a, emitters: emitters,
+            profile: profile, mode: mode, kelvin: kelvin
+        )
+        var out = solved.levels
+        if hasGains {
+            out.multiply(by: gains)
+            if solved.normalized { out.normalize() }
+        }
+        out.clampAndApplyGamma(gamma, applyGamma: hasGamma)
+        return out
+    }
+}
+
+// MARK: - Mixer
+
 /// Converts a device-independent `LightColor` into emitter drive levels (`0…1`) for any LED
-/// emitter topology (RGB, RGBW, RGBA, RGBWW, RGBACL, RGB+Lime, CMY, bi-color CCT, dimmer-only)
-/// using broadband-preferring chromaticity decomposition + active-set Non-Negative Least Squares (NNLS).
+/// emitter topology (RGB, RGBW, RGBA, RGBWW, RGBACL, RGB+Lime, CMY, bi-color CCT, dimmer-only).
+///
+/// **Accurate** mode matches chromaticity exactly: it first takes as much light as possible from
+/// the broadband emitters (white pairs, then amber/lime/cyan…) and covers the exact remainder with
+/// R/G/B, so in-gamut colours reproduce with ΔE2000 ≈ 0 while whites and pastels come mostly from
+/// the high-CRI emitters. Fixtures without a full RGB set use a small non-negative least-squares
+/// solve. **Direct** mode sends the hex straight to R/G/B.
+///
+/// Per-definition emitter chromaticities (`FixtureDefinition.emitters`) are honoured; the derived
+/// matrices are precomputed once per definition and the hot path never allocates.
 public enum EmitterMixer {
     /// Nominal CCT of a standard "warm white" emitter and "cool white" emitter.
     public static let warmWhiteK = 2700.0
@@ -163,13 +583,57 @@ public enum EmitterMixer {
     /// Duv threshold above which a fixture exits its native CCT white path back to RGB (hysteresis band).
     public static let nativeWhiteExitDuv = 0.016
 
-    // MARK: - Native White Path with Hysteresis
+    /// |Duv| up to which CCT↔RGB crossfade fixtures run 100 % on their native white engine
+    /// (covers the full ±1 tint range, which spans ±0.020 Duv).
+    public static let nativeWhiteFullDuv = 0.0205
+    /// |Duv| from which crossfade fixtures run 100 % on RGB. In between the two engines blend
+    /// smoothly, so fades never pop or flicker between paths.
+    public static let nativeWhiteZeroDuv = 0.028
+    /// How far (in mired) outside the fixture's CCT range the native white share fades to zero.
+    public static let nativeWhiteRangeFadeMired = 30.0
+
+    static let allEmitterKinds: [ChannelKind] = [
+        .red, .green, .blue, .white, .warmWhite, .coolWhite,
+        .amber, .lime, .cyan, .magenta, .yellow, .uv, .indigo
+    ]
+
+    static let whiteEmitters: EmitterMask = [.white, .warmWhite, .coolWhite]
+
+    /// White emitters ordered warm → cool (for mired blends).
+    private static let whiteKinds: [ChannelKind] = [.warmWhite, .white, .coolWhite]
+
+    // MARK: - Native White Path
+
+    /// Share (0…1) of a CCT↔RGB crossfade fixture's output that should come from its native
+    /// CCT engine for a colour with the given CCT and Duv: 1 on and near the Planckian locus and
+    /// inside the fixture's CCT range, fading smoothly to 0 for saturated colours or CCTs the
+    /// fixture can't make. Continuous in both inputs, so fades never jump between engines.
+    public static func nativeWhiteShare(kelvin: Double, duv: Double, cctRange: ClosedRange<Double>) -> Double {
+        guard kelvin.isFinite, duv.isFinite, kelvin > 0 else { return 0 }
+        let duvShare = 1 - smoothstep(nativeWhiteFullDuv, nativeWhiteZeroDuv, abs(duv))
+        guard duvShare > 0 else { return 0 }
+        let m = 1e6 / kelvin
+        let warmEdge = 1e6 / max(cctRange.lowerBound, 1)
+        let coolEdge = 1e6 / max(cctRange.upperBound, 1)
+        let outside = m > warmEdge ? m - warmEdge : (m < coolEdge ? coolEdge - m : 0)
+        let rangeShare = 1 - smoothstep(0, nativeWhiteRangeFadeMired, outside)
+        return clamp01(duvShare * rangeShare)
+    }
+
+    /// `nativeWhiteShare(kelvin:duv:cctRange:)` for a colour (0 for black).
+    public static func nativeWhiteShare(for color: LightColor, cctRange: ClosedRange<Double> = 2700...10000) -> Double {
+        let a = ColorAnalysis.of(color)
+        guard !a.isBlack else { return 0 }
+        return nativeWhiteShare(kelvin: a.kelvin, duv: a.duv, cctRange: cctRange)
+    }
 
     /// Determines whether a fixture/cell with a `.cct` channel should use its native white path
     /// (`crossfade = 0`, driving `cct` + `tint` and zeroing RGB emitters) vs its color path (`crossfade = 1`).
     ///
-    /// Includes a hysteresis deadband (`nativeWhiteEnterDuv = 0.006` vs `nativeWhiteExitDuv = 0.016`)
-    /// so crossfades and noisy inputs never flicker between paths.
+    /// Used by fixtures that must *switch* engines (e.g. a colour-mode channel). Includes a
+    /// hysteresis deadband (`nativeWhiteEnterDuv = 0.006` vs `nativeWhiteExitDuv = 0.016`) so
+    /// crossfades and noisy inputs never flicker between paths. Crossfade fixtures blend instead
+    /// (see `nativeWhiteShare`).
     public static func shouldUseNativeWhite(
         for color: LightColor,
         capabilities: ColorCapabilities,
@@ -185,6 +649,7 @@ public enum EmitterMixer {
         )
     }
 
+    /// Allocation-free variant of `shouldUseNativeWhite(for:capabilities:cctRange:previouslyNativeWhite:)`.
     @inline(__always)
     public static func shouldUseNativeWhiteFast(
         for color: LightColor,
@@ -211,11 +676,11 @@ public enum EmitterMixer {
             return sat <= satLimit
 
         case .rgb, .xy:
-            let xy = color.xy
-            let (k, duv) = ColorMath.xyToKelvinAndDuv(x: xy.x, y: xy.y)
+            let a = ColorAnalysis.of(color)
+            guard !a.isBlack else { return false }
             let duvLimit = previouslyNativeWhite ? nativeWhiteExitDuv : nativeWhiteEnterDuv
-            guard abs(duv) <= duvLimit else { return false }
-            return k >= (loK - kMargin) && k <= (hiK + kMargin)
+            guard abs(a.duv) <= duvLimit else { return false }
+            return a.kelvin >= (loK - kMargin) && a.kelvin <= (hiK + kMargin)
         }
     }
 
@@ -235,191 +700,52 @@ public enum EmitterMixer {
     }
 
     /// Returns drive levels keyed by emitter kind, using optional per-fixture `EmitterSpec` overrides.
+    /// - Parameter mode: mixing mode; `nil` uses `calibration.mixingMode`, then `.accurate`.
     public static func mix(
         _ color: LightColor,
         emitters: Set<ChannelKind>,
         emitterSpecs: [ChannelKind: EmitterSpec]?,
-        calibration: ColorCalibration = .default
+        calibration: ColorCalibration = .default,
+        mode: ColorMixingMode? = nil
     ) -> [ChannelKind: Double] {
         guard !emitters.isEmpty else { return [:] }
         let mask = EmitterMask(emitters: emitters)
-        let levels = mixFast(color, emitters: mask, emitterSpecs: emitterSpecs, calibration: calibration)
+        let levels = mixFast(color, emitters: mask, emitterSpecs: emitterSpecs, calibration: calibration, mode: mode)
         return levels.toDictionary(for: emitters)
     }
 
     // MARK: - Zero-Allocation Hot-Path Mixer
 
     /// Computes `EmitterLevels` without heap dictionary or set allocations.
+    /// - Parameter mode: mixing mode; `nil` uses `calibration.mixingMode`, then `.accurate`.
     public static func mixFast(
         _ color: LightColor,
         emitters: EmitterMask,
         emitterSpecs: [ChannelKind: EmitterSpec]? = nil,
-        calibration: ColorCalibration = .default
+        calibration: ColorCalibration = .default,
+        mode: ColorMixingMode? = nil
     ) -> EmitterLevels {
-        var out = EmitterLevels()
-        guard !emitters.isEmpty else { return out }
-
-        let adjustedColor = applyWhitePointTrim(to: color, calibration: calibration)
-        let hasRGB = emitters.isSuperset(of: .rgb)
-        let hasW = emitters.contains(.white)
-        let hasWW = emitters.contains(.warmWhite)
-        let hasCW = emitters.contains(.coolWhite)
-
-        // 1. Non-RGB fixtures (bi-color WW/CW, single white, or CMY).
-        if !hasRGB {
-            if emitters.isSuperset(of: .cmy) {
-                let lin = calibration.accurateColor ? adjustedColor.linearRGB : adjustedColor.displayRGB.linear
-                out.cyan = clamp01(1.0 - lin.r)
-                out.magenta = clamp01(1.0 - lin.g)
-                out.yellow = clamp01(1.0 - lin.b)
-                out.normalize()
-                return applyCalibrationFast(out, emitters: emitters, calibration: calibration)
-            }
-            if hasWW || hasCW {
-                let wwK = emitterSpecs?[.warmWhite]?.cctKelvin ?? warmWhiteK
-                let cwK = emitterSpecs?[.coolWhite]?.cctKelvin ?? coolWhiteK
-                let k = adjustedColor.approximateKelvin.kelvin
-                let denom = (1e6 / wwK) - (1e6 / cwK)
-                let mixT = abs(denom) > 1e-6 ? clamp01(((1e6 / wwK) - (1e6 / max(k, 1))) / denom) : 0.5
-                if hasWW && hasCW {
-                    let ww = 1.0 - mixT
-                    let cw = mixT
-                    let m = max(ww, cw, 1e-6)
-                    out.warmWhite = ww / m
-                    out.coolWhite = cw / m
-                } else if hasWW {
-                    out.warmWhite = 1.0
-                } else {
-                    out.coolWhite = 1.0
-                }
-            }
-            if hasW {
-                out.white = 1.0
-            }
-            // Any isolated single emitters (e.g. amber-only or UV-only)
-            for kind in allEmitterKinds where emitters.contains(EmitterMask.bit(for: kind)) {
-                if !hasWW && !hasCW && !hasW {
-                    out[kind] = 1.0
-                }
-            }
-            return applyCalibrationFast(out, emitters: emitters, calibration: calibration)
-        }
-
-        // 2. Direct mode (`accurateColor == false`):
-        // Hex codes pass straight to R/G/B channels (`#FF00AA` -> exact R/G/B).
-        if !calibration.accurateColor {
-            if case .rgb(let rawRGB) = adjustedColor {
-                out.red = clamp01(rawRGB.r)
-                out.green = clamp01(rawRGB.g)
-                out.blue = clamp01(rawRGB.b)
-                return applyCalibrationFast(out, emitters: emitters, calibration: calibration)
-            }
-            let d = adjustedColor.displayRGB
-            var r = d.r, g = d.g, b = d.b
-            if hasW || hasWW || hasCW {
-                let w = max(0, min(r, min(g, b)))
-                r -= w; g -= w; b -= w
-                if hasWW && hasCW {
-                    let k = adjustedColor.isWhiteish ? adjustedColor.approximateKelvin.kelvin : 5600
-                    let t = clamp01((1e6 / warmWhiteK - 1e6 / max(k, 1)) / (1e6 / warmWhiteK - 1e6 / coolWhiteK))
-                    out.warmWhite = w * (1.0 - t)
-                    out.coolWhite = w * t
-                } else if hasW {
-                    out.white = w
-                } else if hasWW {
-                    out.warmWhite = w
-                } else if hasCW {
-                    out.coolWhite = w
-                }
-            }
-            out.red = r
-            out.green = g
-            out.blue = b
-            out.normalize()
-            return applyCalibrationFast(out, emitters: emitters, calibration: calibration)
-        }
-
-        // 3. Accurate mode (`accurateColor == true`):
-        // Solve in linear RGB / CIE XYZ space so the combined tristimulus output matches
-        // `targetLinear` (ΔE2000 < 2, typically < 0.2) while maximizing broadband W/WW/CW/A/L/C emitters.
-        let targetLinear = adjustedColor.linearRGB
-        let hasCustomRGBSpecs = (emitterSpecs?[.red] != nil || emitterSpecs?[.green] != nil || emitterSpecs?[.blue] != nil)
-
-        if !hasCustomRGBSpecs {
-            out = solveStandardRGBPlusAuxiliary(
-                target: targetLinear,
-                color: adjustedColor,
-                emitters: emitters,
-                emitterSpecs: emitterSpecs
-            )
-        } else {
-            out = solveGeneralNNLS(
-                target: targetLinear,
-                color: adjustedColor,
-                emitters: emitters,
-                emitterSpecs: emitterSpecs
-            )
-        }
-
-        out.normalize()
-        return applyCalibrationFast(out, emitters: emitters, calibration: calibration)
+        guard !emitters.isEmpty else { return EmitterLevels() }
+        let plan = MixPlan(
+            profile: MixerProfile.profile(for: emitterSpecs),
+            calibration: calibration,
+            mode: mode ?? calibration.mixingMode ?? .accurate
+        )
+        let c = plan.trimmed(color)
+        let needCCT = !emitters.isSuperset(of: .rgb) && emitters.isSubset(of: whiteEmitters)
+        return plan.levels(for: c, analysis: ColorAnalysis.of(c, includeCCT: needCCT), emitters: emitters)
     }
 
-    // MARK: - Broadband Extraction + Exact Residual / NNLS Solver
+    // MARK: - Reconstruction & Accuracy
 
-    private static let allEmitterKinds: [ChannelKind] = [
-        .red, .green, .blue, .white, .warmWhite, .coolWhite,
-        .amber, .lime, .cyan, .magenta, .yellow, .uv, .indigo
-    ]
-
-    private static let defaultWhiteBasis: LinearRGB = ColorMath.xyToLinearSRGB(x: 0.330, y: 0.340).normalized
-    private static let defaultWarmWhiteBasis: LinearRGB = ColorMath.xyToLinearSRGB(x: 0.460, y: 0.411).normalized
-    private static let defaultCoolWhiteBasis: LinearRGB = ColorMath.xyToLinearSRGB(x: 0.313, y: 0.329).normalized
-
-    /// Linear sRGB basis vector (normalized to max component = 1, weighted by relative efficacy)
-    /// for a given emitter kind.
+    /// Linear sRGB output of an emitter kind at full drive. Stock bases are normalised to a peak
+    /// of 1; definition-supplied specs are scaled by their lumens and may fall outside sRGB.
     @inline(__always)
     public static func emitterLinearBasis(
         for kind: ChannelKind,
         emitterSpecs: [ChannelKind: EmitterSpec]? = nil
     ) -> LinearRGB {
-        if let custom = emitterSpecs?[kind] {
-            let xyz = ColorMath.xyYToXYZ(x: custom.x, y: custom.y, Y: max(custom.lumens, 0.05))
-            return ColorMath.xyzToLinearSRGB(X: xyz.X, Y: xyz.Y, Z: xyz.Z).clamped
-        }
-        switch kind {
-        case .red:
-            return LinearRGB(r: 1.0, g: 0.0, b: 0.0)
-        case .green:
-            return LinearRGB(r: 0.0, g: 1.0, b: 0.0)
-        case .blue:
-            return LinearRGB(r: 0.0, g: 0.0, b: 1.0)
-        case .white:
-            return defaultWhiteBasis
-        case .warmWhite:
-            return defaultWarmWhiteBasis
-        case .coolWhite:
-            return defaultCoolWhiteBasis
-        case .amber:
-            // ~590nm Amber LED
-            return LinearRGB(r: 1.0, g: 0.395, b: 0.0)
-        case .lime:
-            // ~555nm Lime LED
-            return LinearRGB(r: 0.505, g: 1.0, b: 0.046)
-        case .cyan:
-            // ~500nm Cyan LED
-            return LinearRGB(r: 0.0, g: 0.85, b: 1.0)
-        case .magenta:
-            return LinearRGB(r: 1.0, g: 0.075, b: 0.785)
-        case .yellow:
-            return LinearRGB(r: 0.92, g: 1.0, b: 0.03)
-        case .indigo:
-            return LinearRGB(r: 0.16, g: 0.0, b: 1.0)
-        case .uv:
-            return LinearRGB(r: 0.24, g: 0.0, b: 1.0)
-        default:
-            return .black
-        }
+        MixerProfile.profile(for: emitterSpecs).linear[kind]
     }
 
     /// Reconstructs the normalized linear sRGB chromaticity produced by a set of emitter levels.
@@ -427,9 +753,10 @@ public enum EmitterMixer {
         from levels: [ChannelKind: Double],
         emitterSpecs: [ChannelKind: EmitterSpec]? = nil
     ) -> LinearRGB {
+        let bases = MixerProfile.profile(for: emitterSpecs).linear
         var r = 0.0, g = 0.0, b = 0.0
         for (kind, weight) in levels where weight > 0 && kind.isEmitter {
-            let basis = emitterLinearBasis(for: kind, emitterSpecs: emitterSpecs)
+            let basis = bases[kind]
             r += weight * basis.r
             g += weight * basis.g
             b += weight * basis.b
@@ -452,355 +779,295 @@ public enum EmitterMixer {
         levels: [ChannelKind: Double],
         emitterSpecs: [ChannelKind: EmitterSpec]? = nil
     ) -> Double {
-        let targetRGB = RGB(linear: target.linearRGB)
-        let mixedRGB = reconstructedRGB(from: levels, emitterSpecs: emitterSpecs)
-        return ColorMath.deltaE2000(targetRGB, mixedRGB)
+        ColorMath.deltaE2000(target.linearRGB, reconstructedLinearRGB(from: levels, emitterSpecs: emitterSpecs))
     }
 
-    /// Fast analytical + broadband-priority solver when R, G, B use standard sRGB primaries
-    /// and any combination of W, WW, CW, Amber, Lime, Cyan, Magenta, Yellow, Indigo, UV are present.
-    private static func solveStandardRGBPlusAuxiliary(
+    // MARK: - Solvers
+
+    /// Uncalibrated levels for `target` (normalised linear sRGB). `normalized` reports whether
+    /// the result is peak-normalised (so calibration gains may re-normalise it).
+    static func solve(
         target: LinearRGB,
         color: LightColor,
+        analysis a: ColorAnalysis,
         emitters: EmitterMask,
-        emitterSpecs: [ChannelKind: EmitterSpec]?
-    ) -> EmitterLevels {
+        profile p: MixerProfile,
+        mode: ColorMixingMode,
+        kelvin: Double
+    ) -> (levels: EmitterLevels, normalized: Bool) {
         var out = EmitterLevels()
-        var remR = max(0, target.r)
-        var remG = max(0, target.g)
-        var remB = max(0, target.b)
-
-        // Pure RGB fast path (0 auxiliary emitters)
-        let auxMask = emitters.subtracting(.rgb)
-        if auxMask.isEmpty {
-            out.red = remR
-            out.green = remG
-            out.blue = remB
-            return out
+        if emitters.isSuperset(of: .rgb) {
+            if mode == .direct {
+                let d = directRGB(color, a)
+                out.red = clamp01(d.r)
+                out.green = clamp01(d.g)
+                out.blue = clamp01(d.b)
+                return (out, false)
+            }
+            return (solveAccurateRGB(target: target, saturation: a.saturation, emitters: emitters, profile: p), true)
         }
-
-        // Helper: maximum scale `s >= 0` such that `rem - s * basis >= 0` component-wise.
-        @inline(__always)
-        func maxExtractable(_ basis: LinearRGB) -> Double {
-            var limit = Double.greatestFiniteMagnitude
-            if basis.r > 1e-6 { limit = min(limit, remR / basis.r) }
-            if basis.g > 1e-6 { limit = min(limit, remG / basis.g) }
-            if basis.b > 1e-6 { limit = min(limit, remB / basis.b) }
-            return limit.isFinite ? max(0, limit) : 0
+        if emitters.isSuperset(of: .cmy) {
+            // Subtractive flags over a white source: never re-normalise (that over-saturates pastels).
+            var r = target.r, g = target.g, b = target.b
+            if mode == .direct {
+                let d = directRGB(color, a)
+                r = d.r; g = d.g; b = d.b
+            }
+            out.cyan = clamp01(1 - r)
+            out.magenta = clamp01(1 - g)
+            out.yellow = clamp01(1 - b)
+            return (out, false)
         }
-
-        @inline(__always)
-        func subtract(_ weight: Double, _ basis: LinearRGB) {
-            guard weight > 1e-9 else { return }
-            remR = max(0, remR - weight * basis.r)
-            remG = max(0, remG - weight * basis.g)
-            remB = max(0, remB - weight * basis.b)
+        if emitters.isSubset(of: whiteEmitters) {
+            return (whiteBlend(kelvin: kelvin, emitters: emitters, profile: p), true)
         }
+        if emitters.rawValue.nonzeroBitCount == 1 {
+            for kind in allEmitterKinds where emitters.contains(EmitterMask.bit(for: kind)) {
+                out[kind] = 1
+            }
+            return (out, true)
+        }
+        return (solveNNLS(target: target, emitters: emitters, bases: p.linear), true)
+    }
 
-        // Step 1: Broadband White extraction (WW + CW dual-white, or single W / WW / CW)
-        let hasW = emitters.contains(.white)
-        let hasWW = emitters.contains(.warmWhite)
-        let hasCW = emitters.contains(.coolWhite)
+    /// The sRGB values Direct mode sends: the exact hex for `.rgb`, the sRGB equivalent otherwise.
+    @inline(__always)
+    static func directRGB(_ color: LightColor, _ a: ColorAnalysis) -> RGB {
+        if case .rgb(let c) = color { return c }
+        return a.display
+    }
 
-        if hasWW && hasCW {
-            let bWW = emitterLinearBasis(for: .warmWhite, emitterSpecs: emitterSpecs)
-            let bCW = emitterLinearBasis(for: .coolWhite, emitterSpecs: emitterSpecs)
-            // Estimate warm/cool ratio from target red/blue ratio in linear space (avoids expensive uv scan when possible)
-            let mixT: Double
-            if case .kelvin(let k, _) = color {
-                mixT = clamp01((1e6 / warmWhiteK - 1e6 / max(k, 1)) / (1e6 / warmWhiteK - 1e6 / coolWhiteK))
+    /// Bi-colour / multi-white fixtures: blend the two present whites that bracket the target
+    /// CCT, linearly in mired (the warmest/coolest white alone outside their span).
+    static func whiteBlend(kelvin: Double, emitters: EmitterMask, profile p: MixerProfile) -> EmitterLevels {
+        var out = EmitterLevels()
+        let m = 1e6 / clamp(kelvin.finiteOr(5600), 1000, 25000)
+        var warm: ChannelKind? = nil
+        var warmM = 0.0
+        var cool: ChannelKind? = nil
+        var coolM = 0.0
+        for kind in whiteKinds where emitters.contains(EmitterMask.bit(for: kind)) {
+            let km = 1e6 / max(p.nominalKelvin(of: kind), 1)
+            if km >= m, warm == nil || km < warmM { warm = kind; warmM = km }
+            if km <= m, cool == nil || km > coolM { cool = kind; coolM = km }
+        }
+        switch (warm, cool) {
+        case let (w?, c?):
+            if w == c || warmM - coolM < 1e-9 {
+                out[w] = 1
             } else {
-                // Smoothly map linear B/R ratio between warmWhite (B/R ≈ 0.20) and coolWhite (B/R ≈ 1.0)
-                let br = remR > 1e-4 ? (remB / remR) : 1.0
-                mixT = clamp01((br - bWW.b) / max(bCW.b - bWW.b, 0.1))
+                let t = clamp01((warmM - m) / (warmM - coolM))
+                let peak = max(1 - t, t)
+                out[w] = (1 - t) / peak
+                out[c] = t / peak
             }
-            let combined = LinearRGB(
-                r: lerp(bWW.r, bCW.r, mixT),
-                g: lerp(bWW.g, bCW.g, mixT),
-                b: lerp(bWW.b, bCW.b, mixT)
-            )
-            let wDual = maxExtractable(combined)
-            if wDual > 0 {
-                let wWW = wDual * (1.0 - mixT)
-                let wCW = wDual * mixT
-                out.warmWhite += wWW
-                out.coolWhite += wCW
-                subtract(wWW, bWW)
-                subtract(wCW, bCW)
-            }
-            // Secondary pass: if warm or cool residual remains (e.g. warm white 2700K or warm pastel), extract remaining WW or CW
-            let extraWW = maxExtractable(bWW) * 0.92
-            if extraWW > 1e-5 {
-                out.warmWhite += extraWW
-                subtract(extraWW, bWW)
-            }
-            let extraCW = maxExtractable(bCW) * 0.92
-            if extraCW > 1e-5 {
-                out.coolWhite += extraCW
-                subtract(extraCW, bCW)
-            }
-        } else if hasW {
-            let bW = emitterLinearBasis(for: .white, emitterSpecs: emitterSpecs)
-            let w = maxExtractable(bW)
-            if w > 0 {
-                out.white = w
-                subtract(w, bW)
-            }
-        } else if hasWW {
-            let bWW = emitterLinearBasis(for: .warmWhite, emitterSpecs: emitterSpecs)
-            let w = maxExtractable(bWW)
-            if w > 0 {
-                out.warmWhite = w
-                subtract(w, bWW)
-            }
-        } else if hasCW {
-            let bCW = emitterLinearBasis(for: .coolWhite, emitterSpecs: emitterSpecs)
-            let w = maxExtractable(bCW)
-            if w > 0 {
-                out.coolWhite = w
-                subtract(w, bCW)
-            }
-        }
-
-        // Step 2: RGBACL / RGB+Lime / RGBA spectral-fullness extraction
-        // When no dedicated W/WW/CW emitter is present (e.g. RGBACL or RGB+Lime), Lime + Amber + Cyan
-        // can synthesize high-CRI white/pastels before falling back to narrowband R/G/B.
-        let hasAmber = emitters.contains(.amber)
-        let hasLime = emitters.contains(.lime)
-        let hasCyan = emitters.contains(.cyan)
-
-        if hasLime && hasAmber && hasCyan && !hasW && !hasWW && !hasCW {
-            // Virtual white from Lime + Amber + Cyan
-            let bL = emitterLinearBasis(for: .lime, emitterSpecs: emitterSpecs)
-            let bA = emitterLinearBasis(for: .amber, emitterSpecs: emitterSpecs)
-            let bC = emitterLinearBasis(for: .cyan, emitterSpecs: emitterSpecs)
-            // Balanced ACL triad (~0.35 A + 0.35 L + 0.85 C produces near-neutral white)
-            let aclBasis = LinearRGB(
-                r: 0.35 * bA.r + 0.35 * bL.r + 0.85 * bC.r,
-                g: 0.35 * bA.g + 0.35 * bL.g + 0.85 * bC.g,
-                b: 0.35 * bA.b + 0.35 * bL.b + 0.85 * bC.b
-            )
-            let wACL = maxExtractable(aclBasis) * 0.90
-            if wACL > 1e-5 {
-                let wA = 0.35 * wACL
-                let wL = 0.35 * wACL
-                let wC = 0.85 * wACL
-                out.amber += wA
-                out.lime += wL
-                out.cyan += wC
-                subtract(wA, bA)
-                subtract(wL, bL)
-                subtract(wC, bC)
-            }
-        }
-
-        // Individual secondary emitter extraction (Lime, Amber, Cyan, Yellow, Magenta, Indigo, UV)
-        // Extract up to 85% of the feasible residual along each present auxiliary emitter so
-        // narrowband primaries and broadband secondaries share load smoothly while keeping
-        // the exact tristimulus sum `sum w_k * E_k == target`!
-        if hasLime {
-            let bL = emitterLinearBasis(for: .lime, emitterSpecs: emitterSpecs)
-            let wL = maxExtractable(bL) * 0.85
-            if wL > 1e-5 {
-                out.lime += wL
-                subtract(wL, bL)
-            }
-        }
-        if hasAmber {
-            let bA = emitterLinearBasis(for: .amber, emitterSpecs: emitterSpecs)
-            let wA = maxExtractable(bA) * 0.88
-            if wA > 1e-5 {
-                out.amber += wA
-                subtract(wA, bA)
-            }
-        }
-        if hasCyan {
-            let bC = emitterLinearBasis(for: .cyan, emitterSpecs: emitterSpecs)
-            let wC = maxExtractable(bC) * 0.85
-            if wC > 1e-5 {
-                out.cyan += wC
-                subtract(wC, bC)
-            }
-        }
-        if emitters.contains(.yellow) {
-            let bY = emitterLinearBasis(for: .yellow, emitterSpecs: emitterSpecs)
-            let wY = maxExtractable(bY) * 0.80
-            if wY > 1e-5 {
-                out.yellow += wY
-                subtract(wY, bY)
-            }
-        }
-        if emitters.contains(.magenta) {
-            let bM = emitterLinearBasis(for: .magenta, emitterSpecs: emitterSpecs)
-            let wM = maxExtractable(bM) * 0.80
-            if wM > 1e-5 {
-                out.magenta += wM
-                subtract(wM, bM)
-            }
-        }
-        if emitters.contains(.indigo) {
-            let bI = emitterLinearBasis(for: .indigo, emitterSpecs: emitterSpecs)
-            let wI = maxExtractable(bI) * 0.75
-            if wI > 1e-5 {
-                out.indigo += wI
-                subtract(wI, bI)
-            }
-        }
-        if emitters.contains(.uv) {
-            let bUV = emitterLinearBasis(for: .uv, emitterSpecs: emitterSpecs)
-            // Engage UV only when blue dominates green strongly (deep blue / violet / UV hues)
-            if remB > remG * 2.5 {
-                let wUV = maxExtractable(bUV) * 0.65
-                if wUV > 1e-5 {
-                    out.uv += wUV
-                    subtract(wUV, bUV)
-                }
-            }
-        }
-
-        // Step 3: Exact remaining primary R, G, B residual
-        // Because every subtraction kept `remR, remG, remB >= 0`, setting R = remR, G = remG, B = remB
-        // guarantees `sum_{k} out[k] * basis(k) == target` identically!
-        out.red = remR
-        out.green = remG
-        out.blue = remB
-        return out
-    }
-
-    /// General Non-Negative Least Squares (NNLS) solver in CIE XYZ / LinearRGB when custom R/G/B
-    /// `EmitterSpec` primaries are provided.
-    private static func solveGeneralNNLS(
-        target: LinearRGB,
-        color: LightColor,
-        emitters: EmitterMask,
-        emitterSpecs: [ChannelKind: EmitterSpec]?
-    ) -> EmitterLevels {
-        // Start from the broadband heuristic solution, then refine via projected Gauss-Seidel NNLS
-        // on the 3xN linear system `A * w = target`.
-        var out = solveStandardRGBPlusAuxiliary(
-            target: target,
-            color: color,
-            emitters: emitters,
-            emitterSpecs: emitterSpecs
-        )
-
-        var activeKinds: [ChannelKind] = []
-        activeKinds.reserveCapacity(8)
-        var bases: [LinearRGB] = []
-        bases.reserveCapacity(8)
-        var weights: [Double] = []
-        weights.reserveCapacity(8)
-        var norms2: [Double] = []
-        norms2.reserveCapacity(8)
-
-        for kind in allEmitterKinds where emitters.contains(EmitterMask.bit(for: kind)) {
-            let b = emitterLinearBasis(for: kind, emitterSpecs: emitterSpecs)
-            let n2 = b.r * b.r + b.g * b.g + b.b * b.b
-            guard n2 > 1e-9 else { continue }
-            activeKinds.append(kind)
-            bases.append(b)
-            weights.append(out[kind])
-            norms2.append(n2)
-        }
-
-        guard !activeKinds.isEmpty else { return out }
-
-        // Compute current residual `res = target - A * w`
-        var resR = target.r
-        var resG = target.g
-        var resB = target.b
-        for i in 0..<activeKinds.count {
-            let w = weights[i]
-            let b = bases[i]
-            resR -= w * b.r
-            resG -= w * b.g
-            resB -= w * b.b
-        }
-
-        // Coordinate-descent / projected Gauss-Seidel NNLS (converges in < 20 iterations for 3xN)
-        for _ in 0..<24 {
-            var maxDelta = 0.0
-            for i in 0..<activeKinds.count {
-                let b = bases[i]
-                let oldW = weights[i]
-                let grad = resR * b.r + resG * b.g + resB * b.b
-                let newW = max(0.0, oldW + grad / norms2[i])
-                let dw = newW - oldW
-                if abs(dw) > 1e-7 {
-                    weights[i] = newW
-                    resR -= dw * b.r
-                    resG -= dw * b.g
-                    resB -= dw * b.b
-                    maxDelta = max(maxDelta, abs(dw))
-                }
-            }
-            if maxDelta < 1e-6 { break }
-        }
-
-        for i in 0..<activeKinds.count {
-            out[activeKinds[i]] = weights[i]
-        }
-        return out
-    }
-
-    // MARK: - Calibration & White-Point Trim
-
-    private static func applyWhitePointTrim(to color: LightColor, calibration: ColorCalibration) -> LightColor {
-        let kTrim = calibration.whitePointKelvinTrim.finiteOr(0)
-        let tTrim = calibration.whitePointTintTrim.finiteOr(0)
-        guard abs(kTrim) > 1e-6 || abs(tTrim) > 1e-6 else { return color }
-
-        switch color {
-        case .kelvin(let k, let t):
-            return .kelvin(clamp(k + kTrim, 1700, 20000), tint: clamp(t + tTrim, -1, 1))
+        case let (w?, nil):
+            out[w] = 1
+        case let (nil, c?):
+            out[c] = 1
         default:
-            // Apply chromatic adaptation scaling relative to neutral 5600K reference
-            let ref = ColorMath.xyToLinearSRGB(x: ColorMath.d65XY.x, y: ColorMath.d65XY.y)
-            let shiftedXY = ColorMath.kelvinToXY(clamp(5600 + kTrim, 1700, 20000), tint: clamp(tTrim, -1, 1))
-            let shifted = ColorMath.xyToLinearSRGB(x: shiftedXY.x, y: shiftedXY.y)
-            let base = color.linearRGB
-            let adapted = LinearRGB(
-                r: base.r * (shifted.r / max(ref.r, 0.05)),
-                g: base.g * (shifted.g / max(ref.g, 0.05)),
-                b: base.b * (shifted.b / max(ref.b, 0.05))
-            ).clamped.normalized
-            return .rgb(RGB(linear: adapted))
+            break
         }
+        return out
+    }
+
+    /// Non-negative least squares by cyclic coordinate descent (≤ 13 unknowns, 3 equations),
+    /// falling back to the best-aligned single emitter when nothing fits.
+    static func solveNNLS(target t: LinearRGB, emitters: EmitterMask, bases: EmitterBases) -> EmitterLevels {
+        var x = EmitterLevels()
+        var recon = LinearRGB.black
+        for _ in 0..<40 {
+            var maxStep = 0.0
+            for kind in allEmitterKinds where emitters.contains(EmitterMask.bit(for: kind)) {
+                let b = bases[kind]
+                let norm2 = b.r * b.r + b.g * b.g + b.b * b.b
+                guard norm2 > 1e-12 else { continue }
+                let grad = b.r * (recon.r - t.r) + b.g * (recon.g - t.g) + b.b * (recon.b - t.b)
+                let old = x[kind]
+                let new = max(0, old - grad / norm2)
+                let step = new - old
+                if step != 0 {
+                    x[kind] = new
+                    recon = recon + b * step
+                    maxStep = max(maxStep, abs(step))
+                }
+            }
+            if maxStep < 1e-7 { break }
+        }
+        if !(x.maxLevel > 1e-9) {
+            var best: ChannelKind? = nil
+            var bestCos = -Double.infinity
+            for kind in allEmitterKinds where emitters.contains(EmitterMask.bit(for: kind)) {
+                let b = bases[kind]
+                let n = (b.r * b.r + b.g * b.g + b.b * b.b).squareRoot()
+                guard n > 1e-9 else { continue }
+                let cosine = (b.r * t.r + b.g * t.g + b.b * t.b) / n
+                if cosine > bestCos { bestCos = cosine; best = kind }
+            }
+            if let best { x[best] = 1 }
+        }
+        x.normalize()
+        return x
+    }
+
+    /// Largest `s` such that `rem − s·b` stays non-negative in every channel `b` lights.
+    @inline(__always)
+    static func extractable(_ rem: LinearRGB, _ b: LinearRGB) -> Double {
+        var s = Double.infinity
+        if b.r > 1e-6 { s = min(s, rem.r / b.r) }
+        if b.g > 1e-6 { s = min(s, rem.g / b.g) }
+        if b.b > 1e-6 { s = min(s, rem.b / b.b) }
+        return s.isFinite ? max(0, s) : 0
     }
 
     @inline(__always)
-    static func applyCalibrationFast(
-        _ levels: EmitterLevels,
-        emitters: EmitterMask,
-        calibration cal: ColorCalibration
-    ) -> EmitterLevels {
-        let hasGains = !cal.gains.isEmpty
-        let hasGamma = cal.gamma != 1.0 && cal.gamma > 0 && cal.gamma.isFinite
-        guard hasGains || hasGamma else { return levels }
+    private static func take(_ s: Double, _ b: LinearRGB, from rem: inout LinearRGB) {
+        rem = LinearRGB(r: max(0, rem.r - s * b.r), g: max(0, rem.g - s * b.g), b: max(0, rem.b - s * b.b))
+    }
 
-        var out = levels
-        let gamma = cal.gamma.finiteOr(1.0)
-        for kind in allEmitterKinds where emitters.contains(EmitterMask.bit(for: kind)) {
-            var x = clamp01(out[kind].finiteOr(0))
-            if hasGains, let g = cal.gains[kind.rawValue] {
-                x = clamp01(x * g.finiteOr(1))
-            }
-            if hasGamma && x > 0 {
-                x = pow(x, gamma)
-            }
-            out[kind] = x
+    /// Blend `t` (0 = all `a`, 1 = all `b`) of two white emitters whose composite covers the most
+    /// luminance of `rem` (so the least is left for R/G/B). Each channel limit makes the covered
+    /// luminance a monotone function of `t`, so the optimum is at an end point or where two
+    /// channel limits cross.
+    static func bestPairBlend(_ rem: LinearRGB, _ a: LinearRGB, _ b: LinearRGB, luma w: LinearRGB) -> Double {
+        @inline(__always)
+        func covered(_ c: LinearRGB) -> Double {
+            extractable(rem, c) * max(0, w.r * c.r + w.g * c.g + w.b * c.b)
         }
+        var bestT = 0.0
+        var bestS = covered(a)
+        let s1 = covered(b)
+        if s1 > bestS + 1e-12 { bestS = s1; bestT = 1 }
+        let d = b - a
+        func consider(_ ri: Double, _ ai: Double, _ di: Double, _ rj: Double, _ aj: Double, _ dj: Double) {
+            let den = ri * dj - rj * di
+            guard abs(den) > 1e-15 else { return }
+            let t = (rj * ai - ri * aj) / den
+            guard t > 0, t < 1, t.isFinite else { return }
+            let s = covered(a + d * t)
+            if s > bestS + 1e-12 { bestS = s; bestT = t }
+        }
+        consider(rem.r, a.r, d.r, rem.g, a.g, d.g)
+        consider(rem.r, a.r, d.r, rem.b, a.b, d.b)
+        consider(rem.g, a.g, d.g, rem.b, a.b, d.b)
+        return bestT
+    }
+
+    /// Accurate mode for fixtures with R, G and B: broadband emitters first, exact R/G/B remainder.
+    static func solveAccurateRGB(
+        target lin: LinearRGB,
+        saturation: Double,
+        emitters: EmitterMask,
+        profile p: MixerProfile
+    ) -> EmitterLevels {
+        var out = EmitterLevels()
+        let sb = p.solver
+
+        // 1. Target in fixture-RGB space. Wide-gamut primaries: whites and pastels are matched
+        // colorimetrically; saturated colours map gamut-relative (sRGB red → the fixture's red).
+        var v = lin
+        if p.customPrimaries {
+            let kv = p.toSolver(lin)
+            let sigma = smoothstep(0.5, 1, saturation)
+            v = LinearRGB(r: lerp(kv.r, lin.r, sigma), g: lerp(kv.g, lin.g, sigma), b: lerp(kv.b, lin.b, sigma))
+            if v.minComponent < 0 {
+                // Out of the fixture gamut: desaturate toward equal-luminance grey until it fits.
+                let w = p.lumaWeights
+                let l = w.r * v.r + w.g * v.g + w.b * v.b
+                if l > 1e-9 {
+                    var alpha = 1.0
+                    if v.r < 0 { alpha = min(alpha, l / (l - v.r)) }
+                    if v.g < 0 { alpha = min(alpha, l / (l - v.g)) }
+                    if v.b < 0 { alpha = min(alpha, l / (l - v.b)) }
+                    v = LinearRGB(r: l + alpha * (v.r - l), g: l + alpha * (v.g - l), b: l + alpha * (v.b - l))
+                }
+            }
+        }
+        var rem = LinearRGB(r: max(0, v.r.finiteOr(0)), g: max(0, v.g.finiteOr(0)), b: max(0, v.b.finiteOr(0)))
+
+        // 2. White emitters: the warm/cool pair that fits best, then any remaining single white.
+        let hasW = emitters.contains(.white)
+        let hasWW = emitters.contains(.warmWhite)
+        let hasCW = emitters.contains(.coolWhite)
+        var whiteUsedInPair = false
+        if hasWW && (hasCW || hasW) {
+            let coolIsW = !hasCW
+            let a = sb.warmWhite
+            let b = coolIsW ? sb.white : sb.coolWhite
+            let t = bestPairBlend(rem, a, b, luma: p.lumaWeights)
+            let composite = a * (1 - t) + b * t
+            let s = extractable(rem, composite)
+            if s > 0 {
+                take(s, composite, from: &rem)
+                out.warmWhite += s * (1 - t)
+                if coolIsW { out.white += s * t } else { out.coolWhite += s * t }
+            }
+            whiteUsedInPair = coolIsW
+        }
+        if hasW && !whiteUsedInPair {
+            let s = extractable(rem, sb.white)
+            take(s, sb.white, from: &rem)
+            out.white += s
+        }
+        if hasWW && !hasCW && !hasW {
+            let s = extractable(rem, sb.warmWhite)
+            take(s, sb.warmWhite, from: &rem)
+            out.warmWhite += s
+        }
+        if hasCW && !hasWW {
+            let s = extractable(rem, sb.coolWhite)
+            take(s, sb.coolWhite, from: &rem)
+            out.coolWhite += s
+        }
+
+        // 3. RGBACL without whites: amber + lime + cyan together make a broadband "virtual white".
+        if !hasW && !hasWW && !hasCW && emitters.isSuperset(of: [.amber, .lime, .cyan]) {
+            let composite = sb.amber * 0.35 + sb.lime * 0.35 + sb.cyan * 0.85
+            let s = 0.9 * extractable(rem, composite)
+            if s > 0 {
+                take(s, composite, from: &rem)
+                out.amber += 0.35 * s
+                out.lime += 0.35 * s
+                out.cyan += 0.85 * s
+            }
+        }
+
+        // 4. Remaining auxiliary emitters take most (not all) of what fits, keeping R/G/B in play.
+        extractAux(.lime, 0.85, sb.lime, emitters, &rem, &out)
+        extractAux(.amber, 0.88, sb.amber, emitters, &rem, &out)
+        extractAux(.cyan, 0.85, sb.cyan, emitters, &rem, &out)
+        extractAux(.yellow, 0.80, sb.yellow, emitters, &rem, &out)
+        extractAux(.magenta, 0.80, sb.magenta, emitters, &rem, &out)
+        extractAux(.indigo, 0.75, sb.indigo, emitters, &rem, &out)
+        if emitters.contains(.uv) {
+            // UV only for deep blue/violet targets.
+            let violet = smoothstep(2, 3, rem.b / max(rem.g, 1e-9))
+            if violet > 0 {
+                extractAux(.uv, 0.65 * violet, sb.uv, emitters, &rem, &out)
+            }
+        }
+
+        // 5. Exact remainder on R/G/B (fixture-RGB amount × white-balance gain = drive).
+        out.red = rem.r * p.driveGain.r
+        out.green = rem.g * p.driveGain.g
+        out.blue = rem.b * p.driveGain.b
+        out.normalize()
         return out
     }
 
-    static func applyCalibration(_ levels: [ChannelKind: Double], _ cal: ColorCalibration) -> [ChannelKind: Double] {
-        var out = levels
-        for (k, v) in levels {
-            var x = clamp01(v.finiteOr(0))
-            if let g = cal.gains[k.rawValue] { x = clamp01(x * g.finiteOr(1)) }
-            if cal.gamma != 1, cal.gamma > 0 { x = pow(x, cal.gamma) }
-            out[k] = x
-        }
-        return out
+    @inline(__always)
+    private static func extractAux(
+        _ kind: ChannelKind,
+        _ fraction: Double,
+        _ basis: LinearRGB,
+        _ emitters: EmitterMask,
+        _ rem: inout LinearRGB,
+        _ out: inout EmitterLevels
+    ) {
+        guard emitters.contains(EmitterMask.bit(for: kind)) else { return }
+        let s = fraction * extractable(rem, basis)
+        guard s > 0 else { return }
+        take(s, basis, from: &rem)
+        out[kind] += s
     }
 }

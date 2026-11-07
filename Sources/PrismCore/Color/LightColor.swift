@@ -57,7 +57,7 @@ public enum LightColor: Hashable, Sendable {
         case .hsi(let hue, let sat):
             // Saturation blends from 5600K white to the fully saturated hue (in linear light).
             let pure = RGB(hue: hue, saturation: 1, value: 1).linear
-            let white = LightColor.kelvin(5600, tint: 0).linearRGB
+            let white = LightColor.hsiWhiteLinear
             let s = clamp01(sat)
             return LinearRGB(
                 r: lerp(white.r, pure.r, s),
@@ -165,17 +165,38 @@ public enum LightColor: Hashable, Sendable {
     /// Perceptually smooth interpolation between two colors.
     /// Kelvin↔Kelvin interpolates in mireds (so it stays on the white line); everything else
     /// interpolates in OKLab with chroma restoration so fades between distant hues never dip through grey.
+    /// Identical endpoints return the color unchanged, and the hex "value" of `.rgb` colors is
+    /// interpolated too, so Direct mode (hex straight to R/G/B) stays continuous at fade ends.
     public static func mix(_ a: LightColor, _ b: LightColor, _ t: Double) -> LightColor {
         let t = clamp01(t)
         if t <= 0 { return a }
         if t >= 1 { return b }
+        if a == b { return a }
         if case .kelvin(let k1, let t1) = a, case .kelvin(let k2, let t2) = b {
             let m = lerp(1e6 / max(k1, 1), 1e6 / max(k2, 1), t)
             return .kelvin(1e6 / max(m, 1), tint: lerp(t1, t2, t))
         }
         let mixed = ColorMath.mixOKLab(a.linearRGB, b.linearRGB, t)
-        return .rgb(RGB(linear: mixed.clamped.normalized))
+        var rgb = RGB(linear: mixed.clamped.normalized)
+        let va = a.rgbPeak, vb = b.rgbPeak
+        if va < 1 - 1e-9 || vb < 1 - 1e-9 {
+            let v = lerp(va, vb, t)
+            rgb = RGB(r: rgb.r * v, g: rgb.g * v, b: rgb.b * v)
+        }
+        return .rgb(rgb)
     }
+
+    /// Largest sRGB component of an `.rgb` color (its "value"); 1 for every other representation.
+    var rgbPeak: Double {
+        guard case .rgb(let c) = self else { return 1 }
+        return clamp01(max(c.r, c.g, c.b))
+    }
+
+    /// Linear white point of `.hsi` colors (5600 K), computed once.
+    static let hsiWhiteLinear: LinearRGB = {
+        let (x, y) = ColorMath.kelvinToXY(5600, tint: 0)
+        return ColorMath.xyToLinearSRGB(x: x, y: y).normalized
+    }()
 }
 
 // MARK: - Codable (stable, human-readable JSON)
