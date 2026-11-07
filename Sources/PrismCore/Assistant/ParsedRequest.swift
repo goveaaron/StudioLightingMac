@@ -69,6 +69,7 @@ public indirect enum TargetSpec: Hashable, Sendable {
         case .area: return true
         case .single(let t): return t.isSpatial
         case .all(let items): return items.contains { $0.isSpatial }
+        case .any(let items): return !items.isEmpty && items.allSatisfy { $0.isSpatial }
         default: return false
         }
     }

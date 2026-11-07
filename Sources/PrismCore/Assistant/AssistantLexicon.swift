@@ -217,7 +217,7 @@ enum AssistantLexicon {
         // Adjectives (used after "too").
         add(["bright", "intense", "strong", "hot", "harsh", "loud"], .adjective(.intensity, 1))
         add(["dark", "dull", "weak", "gloomy", "moody"], .adjective(.intensity, -1))
-                add(["cold", "icy", "clinical", "sterile"], .adjective(.warmth, -1))
+        add(["cold", "icy", "clinical", "sterile"], .adjective(.warmth, -1))
         add(["saturated", "vivid", "garish", "colorful", "colourful", "vibrant"], .adjective(.saturation, 1))
         add(["pale", "washed", "muted", "flat"], .adjective(.saturation, -1))
 
@@ -244,7 +244,7 @@ enum AssistantLexicon {
         // Units.
         add(["percent", "per cent", "pc", "pct"], .unit(.percent))
         add(["k", "kelvin", "kelvins", "degrees kelvin"], .unit(.kelvin))
-        add(["stop", "stops", "f stop", "f stops"], .unit(.stops))
+        add(["stops", "f stop", "f stops"], .unit(.stops))
         add(["second", "seconds", "sec", "secs", "s"], .unit(.seconds))
         add(["minute", "minutes", "mins"], .unit(.minutes))
 
@@ -362,7 +362,7 @@ enum AssistantLexicon {
              "the same for", "same thing for", "same thing on", "same goes for", "as well", "the same"], .control(.same))
 
         // Looks.
-        add(["look", "scene", "scenes", "preset", "presets", "setup", "set up", "cue", "snapshot", "looks"], .look)
+        add(["look", "scene", "scenes", "preset", "presets", "setup", "cue", "snapshot", "looks"], .look)
 
         // Effects.
         add(["candle", "candles", "candlelight", "candle light"], .effectOrColor(.candle, ColorSpec(name: "candlelight", color: .kelvin(1900, tint: 0))))
@@ -455,7 +455,8 @@ enum AssistantLexicon {
         words.formUnion(stopWords)
         words.formUnion(AssistantText.unitWords.keys)
         words.formUnion(AssistantText.tensWords.keys)
-        words.formUnion(["hundred", "thousand", "one", "prism", "light", "app", "lights", "kelvin", "percent"])
+        words.formUnion(["hundred", "thousand", "one", "prism", "light", "app", "lights", "kelvin", "percent", "stop",
+                          "bluer", "redder", "greener", "pinker", "purpler", "tealer", "oranger", "yellower"])
         return words
     }()
 
@@ -564,7 +565,7 @@ struct AssistantLexer {
     func isUnitWord(at i: Int, in tokens: [String]) -> Bool {
         guard i < tokens.count else { return false }
         if case .unit? = AssistantLexicon.table[tokens[i]] { return true }
-        return false
+        return tokens[i] == "stop"
     }
 
     func colorComparative(_ tok: String) -> ColorSpec? {
