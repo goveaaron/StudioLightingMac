@@ -90,6 +90,13 @@ Land small, green increments often (at least at every milestone):
 If `main` is red because of someone else, tell the orchestrator; fix it yourself only if
 it's clearly in your area or trivial.
 
+**Releases are the orchestrator's job** (`gh workflow run ci.yml --ref main -f release=true`,
+optional `-f version=1.2.3`, `-f prerelease=true`). The run tags the commit first, builds the
+universal signed app, publishes it as a pre-release, installs it with the real curl one-liner on
+Apple silicon and Intel, and only then makes it the release the installer downloads. Don't
+change `.github/workflows/*` yourself — besides being shared, a workflow change on `main` while
+a release run is starting stops GitHub from letting Actions tag the release commit.
+
 ## 4. Ownership
 
 Each agent owns specific directories (listed in your brief). You may freely edit files you
