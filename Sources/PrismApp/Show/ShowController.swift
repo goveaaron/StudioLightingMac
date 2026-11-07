@@ -24,6 +24,12 @@ struct ShowChange: OptionSet {
 ///   - `updateStates(_:...)`     — direct per-fixture edits from the inspector/stage
 ///   - `editProject(_:...)`      — structural edits (patch, layout, looks, groups)
 ///   - `editLive(...)`           — live-only edits (masters, music); undo optional
+///   - `applyPlan(_:origin:undoName:)` — a multi-step plan (assistant) as a single undo step
+///   - `beginInteractiveChange(coalesceKey:)` / `endInteractiveChange()` — wrap a slider, knob or
+///     drag gesture so the whole gesture becomes one undo step
+///
+/// Keep this type lean: feature teams add their convenience helpers as `extension ShowController`
+/// in their own folders, built on the APIs above (never by bypassing them).
 @MainActor
 @Observable
 final class ShowController {
