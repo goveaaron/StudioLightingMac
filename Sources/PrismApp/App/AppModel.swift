@@ -82,19 +82,17 @@ final class AppModel {
             Task { @MainActor in await ScreenshotTour.run(app: self, outputDirectory: dir) }
         } else if launch.selfTest {
             Task { @MainActor in await SelfTest.runAndExit(app: self) }
+        } else if let soakSeconds = launch.soakSeconds {
+            Task { @MainActor in await SoakRunner.runAndExit(app: self, seconds: soakSeconds) }
         }
     }
 
     /// Called from applicationWillTerminate. Fast and non-blocking.
     func shutdown() {
         guard isStarted else { return }
-        if preferences.blackoutOnQuit {
-            show.setBlackout(true)
-            engine.tick()
-        }
         show.shutdown()
         for service in services { service.shutdown() }
-        engine.stop()
+        engine.shutdown(blackout: preferences.blackoutOnQuit)
         CrashGuard.markCleanExit()
     }
 

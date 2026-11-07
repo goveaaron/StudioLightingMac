@@ -9,6 +9,7 @@ import Foundation
 ///   --no-hardware          never open DMX devices (simulation only)
 ///   --project PATH         open a project file on launch
 ///   --reset                forget app preferences (keeps projects)
+///   --soak [SECONDS]       run automated engine soak test for SECONDS (default 60) and exit
 struct LaunchOptions {
     var demo = false
     var screenshotTourDirectory: URL?
@@ -17,6 +18,7 @@ struct LaunchOptions {
     var noHardware = false
     var projectPath: URL?
     var reset = false
+    var soakSeconds: Double?
 
     static let current = LaunchOptions(arguments: CommandLine.arguments, environment: ProcessInfo.processInfo.environment)
 
@@ -39,6 +41,13 @@ struct LaunchOptions {
             case "--project":
                 if let p = next() { projectPath = URL(fileURLWithPath: p) }
             case "--reset": reset = true
+            case "--soak":
+                if i + 1 < arguments.count, let secs = Double(arguments[i + 1]), secs > 0 {
+                    i += 1
+                    soakSeconds = secs
+                } else {
+                    soakSeconds = 60
+                }
             default: break // ignore unknown (e.g. -NSDocumentRevisionsDebugMode from Xcode)
             }
             i += 1
@@ -48,11 +57,11 @@ struct LaunchOptions {
         }
         if environment["PRISM_NO_HARDWARE"] == "1" { noHardware = true }
         // Automated runs never touch real hardware and always use the demo rig.
-        if screenshotTourDirectory != nil || selfTest {
+        if screenshotTourDirectory != nil || selfTest || soakSeconds != nil {
             noHardware = true
             demo = true
         }
     }
 
-    var isAutomated: Bool { screenshotTourDirectory != nil || selfTest }
+    var isAutomated: Bool { screenshotTourDirectory != nil || selfTest || soakSeconds != nil }
 }
