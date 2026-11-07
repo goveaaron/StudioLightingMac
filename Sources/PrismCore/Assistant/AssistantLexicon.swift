@@ -13,7 +13,7 @@ enum AssistantParticle: String, Sendable { case up, down, on, off }
 
 enum AssistantUnit: String, Sendable { case percent, kelvin, stops, seconds, minutes }
 
-enum AssistantPrep: String, Sendable { case to, by, over, within, from, with, at, on, of, toward, like, as, called, for_ }
+enum AssistantPrep: String, Sendable { case to, by, over, within, from, with, at, on, of, toward, like, as_, called, for_ }
 
 enum AssistantControl: Hashable, Sendable {
     case undo, redo, help, whatsOn, blackout, lightsOn, freeze, unfreeze, recording, recordingOff, acknowledge, otherSide, tooMuch, again, same
@@ -204,7 +204,7 @@ enum AssistantLexicon {
         add(["up"], .particle(.up))
         add(["down"], .particle(.down))
         add(["on", "back on", "on again", "fade in"], .particle(.on))
-        add(["off", "fade out", "back off again"], .particle(.off))
+        add(["off", "out", "fade out", "back off again"], .particle(.off))
 
         // Comparatives.
         add(["brighter", "lighter", "stronger", "higher", "louder", "punchier", "more light", "more intense"], .comparative(.intensity, 1))
@@ -436,7 +436,7 @@ enum AssistantLexicon {
         add(["of"], .prep(.of))
         add(["toward", "towards"], .prep(.toward))
         add(["like", "look like", "looks like", "feel like", "feels like", "similar to", "kind of like", "sort of like"], .prep(.like))
-        add(["as"], .prep(.as))
+        add(["as"], .prep(.as_))
         add(["called", "named"], .prep(.called))
         add(["for"], .prep(.for_))
 

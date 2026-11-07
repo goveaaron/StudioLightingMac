@@ -105,7 +105,7 @@ public struct AssistantParser: Sendable {
         if hasSave {
             var nameTokens: [LexToken] = []
             if let k = lexed.firstIndex(where: { tok in
-                if case .prep(let p) = tok.lex { return p == .as || p == .called }
+                if case .prep(let p) = tok.lex { return p == .as_ || p == .called }
                 return false
             }) {
                 nameTokens = Array(lexed[(k + 1)...])
@@ -462,7 +462,9 @@ public struct AssistantParser: Sendable {
         while i < toks.count {
             let tok = toks[i]
             switch tok.lex {
-            case .verb(let v): f.verbs.append(v)
+            case .verb(let v):
+                f.verbs.append(v)
+                if tok.text == "fade" { f.fades.append(2) }
             case .particle(let p):
                 f.particles.append(p)
                 if tok.text.hasPrefix("fade") { f.fades.append(2) }
