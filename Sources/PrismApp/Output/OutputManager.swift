@@ -260,7 +260,8 @@ final class OutputManager: AppService {
 
     /// Friendly toasts for the moments that matter (never during automated runs).
     private func announce(_ m: ManagedDevice, from old: DMXDeviceState, to snap: DMXDeviceSnapshot) {
-        guard let app, !app.launch.isAutomated, !snap.kind.isNetwork, m.isEnabled else { return }
+        guard let app, !app.launch.isAutomated, !snap.kind.isNetwork, m.isEnabled,
+              !(m.device is SimulatedDMXDevice) else { return }
         switch snap.state {
         case .live where old != .live:
             m.announcedLive = true
@@ -439,6 +440,8 @@ final class OutputManager: AppService {
     // MARK: - Settings actions
 
     private func save() {
+        // Simulated devices (tour, self-test) must never end up in the user's settings.
+        guard !simulatedDevicesInstalled else { return }
         if let data = configuration.encoded() { UserDefaults.standard.set(data, forKey: Self.configurationKey) }
     }
 

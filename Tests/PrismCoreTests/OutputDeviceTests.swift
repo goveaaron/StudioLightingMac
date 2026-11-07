@@ -165,10 +165,15 @@ final class OutputDeviceTests: XCTestCase {
         XCTAssertEqual(widget.frameCount(label: 6), 0)
     }
 
-    func testStopIsBoundedWhileSearching() {
+    func testSubmitAndStopStayWithinBudget() {
         let device = EnttecProDevice(id: "none", options: Self.fastOptions(), locate: { nil })
         device.start()
         XCTAssertTrue(waitFor(2) { device.snapshot.state == .searching })
+        // The engine tick hands frames over without ever waiting, even with no box.
+        let data = frame(3)
+        let submitStart = Date()
+        for _ in 0..<300 { device.submit(port: 1, data: data) }
+        XCTAssertLessThan(Date().timeIntervalSince(submitStart), 0.5)
         let started = Date()
         device.stop(flushTimeout: 0.1)
         XCTAssertLessThan(Date().timeIntervalSince(started), 0.5)
