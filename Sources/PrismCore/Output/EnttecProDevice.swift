@@ -93,7 +93,7 @@ public final class EnttecProDevice: DMXDevice, @unchecked Sendable {
                 attempt += 1
                 continue
             }
-            runtime.update { $0.state = .connecting; $0.path = path }
+            runtime.beginConnecting(path: path)
             let port: SerialPort
             do {
                 port = try SerialPort.open(path: path, baud: options.baud)

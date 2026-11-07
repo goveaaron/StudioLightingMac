@@ -263,18 +263,40 @@ final class OutputManager: AppService {
         guard let app, !app.launch.isAutomated, !snap.kind.isNetwork, m.isEnabled else { return }
         switch snap.state {
         case .live where old != .live:
-            app.ui.toast("DMX box connected — your lights are live", style: .success, systemImage: "cable.connector")
             m.announcedLive = true
         case .searching, .failed:
             guard old == .live, PrismClock.now() - lastWake > 10 else { return }
-            app.ui.toast("DMX box unplugged — plug it back in and Prism reconnects by itself", style: .warning,
-                         systemImage: "cable.connector", duration: 5)
         case .busy where old != .busy:
-            app.ui.toast("Another app is using your DMX box. Quit Lightkey or QLC+ and Prism connects by itself.",
+            break
+        default:
+            return
+        }
+        guard let toast = Self.toast(for: snap.state) else { return }
+        app.ui.toast(toast.message, style: toast.style, systemImage: toast.systemImage, duration: toast.duration)
+    }
+
+    /// The toast for a device state worth announcing (also used by the screenshot tour).
+    static func toast(for state: DMXDeviceState) -> Toast? {
+        switch state {
+        case .live:
+            return Toast(message: "DMX box connected — your lights are live", style: .success,
+                         systemImage: "cable.connector.horizontal")
+        case .searching, .failed:
+            return Toast(message: "DMX box unplugged — plug it back in and Prism reconnects by itself", style: .warning,
+                         systemImage: "cable.connector.horizontal", duration: 5)
+        case .busy:
+            return Toast(message: "Another app is using your DMX box. Quit Lightkey or QLC+ and Prism connects by itself.",
                          style: .error, systemImage: "exclamationmark.triangle.fill", duration: 7)
         default:
-            break
+            return nil
         }
+    }
+
+    /// A Hardware Test or Outputs sheet closed. Screenshot-tour scenes install simulated
+    /// devices; they're removed here so later scenes see the normal simulation state.
+    func sheetClosed() {
+        guard let app, app.launch.isAutomated, simulatedDevicesInstalled else { return }
+        removeSimulatedDevices()
     }
 
     /// Stops a device off the main thread, then runs `then` on the main actor.

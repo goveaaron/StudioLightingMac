@@ -46,6 +46,7 @@ struct SheetRouter: View {
             case .importLightkey: ImportLightkeySheet()
             case .keyboardShortcuts: KeyboardShortcutsSheet()
             case .hardwareTest: HardwareTestSheet()
+            case .outputSettings: OutputSettingsSheet()
             case .lightFinder: LightFinderSheet()
             case .welcome: WelcomeSheet()
             case .templates: TemplatesSheet()

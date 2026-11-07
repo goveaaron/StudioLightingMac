@@ -416,6 +416,18 @@ final class DeviceRuntime: @unchecked Sendable {
         }
     }
 
+    /// Shows "Connecting…" before opening `path` — except while retrying a box that was busy,
+    /// unrecognized or failing: that state stays up, so the status doesn't flicker every retry.
+    func beginConnecting(path: String) {
+        update { s in
+            switch s.state {
+            case .busy, .unsupported, .failed: break
+            default: s.state = .connecting
+            }
+            s.path = path
+        }
+    }
+
     // MARK: Counters
 
     /// Counts a completed write. `latency` is nil for keep-alive resends.

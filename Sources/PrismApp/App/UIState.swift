@@ -42,6 +42,7 @@ enum AppSheet: String, Identifiable {
     case importLightkey     // Patch
     case keyboardShortcuts  // Shell
     case hardwareTest       // Hardware (Output/)
+    case outputSettings     // Hardware (Output/) — Settings › Outputs as a sheet
     case lightFinder        // Camera
     case welcome            // Shell (Onboarding/)
     case templates          // Shell (Onboarding/)
