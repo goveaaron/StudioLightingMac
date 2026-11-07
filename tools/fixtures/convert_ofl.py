@@ -427,8 +427,39 @@ def channel_kind(name, caps, wheels, maxv):
 # Capability conversion
 # --------------------------------------------------------------------------------------
 
+CAP_UNIT_SUFFIX = {"deg": "°", "%": "%", "K": " K", "Hz": " Hz", "s": " s", "ms": " ms", "rpm": " rpm",
+                   "bpm": " bpm", "m": " m", "mm": " mm", "xy": "", "lx": " lx", "lm": " lm"}
+CAP_KIND_NAMES = {"open": "Open", "closed": "Closed", "none": "No function", "cct": "Color temperature",
+                  "cieX": "CIE x", "cieY": "CIE y", "panTiltSpeed": "Pan/tilt speed", "colorMacro": "Color macro",
+                  "goboRotation": "Gobo rotation"}
+
+
+def _humanize(name):
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name or "").split()
+    text = " ".join(words).lower()
+    return text[:1].upper() + text[1:] if text else ""
+
+
+def _fmt_num(v):
+    return ("%g" % v) if isinstance(v, (int, float)) else str(v)
+
+
+def synthesize_cap_label(cap_type, kind, out):
+    """Readable label for a capability OFL left without a comment: "Pan 0–530°", "Strobe 1–25 Hz"."""
+    base = CAP_KIND_NAMES.get(kind) or (_humanize(kind) if kind and kind != "generic" else _humanize(cap_type))
+    unit = out.get("unit")
+    suffix = CAP_UNIT_SUFFIX.get(unit, (" " + str(unit)) if unit else "")
+    if "value" in out:
+        return "%s %s%s" % (base, _fmt_num(out["value"]), suffix)
+    if "from" in out and "to" in out:
+        return "%s %s–%s%s" % (base, _fmt_num(out["from"]), _fmt_num(out["to"]), suffix)
+    return base or "Range"
+
+
 def convert_capability(cap, maxv, chan_kind, wheels, channel_name):
     t = cap["type"]
+    # Ranges stay in the channel's own resolution; the app scales them by the shared
+    # definition's "res" when it decodes the profile.
     out = {"dmx": list(cap.get("dmxRange", [0, maxv]))}
     k = cap_kind(cap, wheels, channel_name)
     if t == "ShutterStrobe":
@@ -711,6 +742,9 @@ def channel_definition(key, cj, wheels, name_hint=None):
                caps_out[0].get("unit") == "%" and caps_out[0].get("from") == 0 and
                caps_out[0].get("to") == 100 and set(caps_out[0]) <= {"dmx", "kind", "from", "to", "unit"})
     if not trivial:
+        for src_cap, c in zip(caps, caps_out):
+            if not c.get("label"):
+                c["label"] = synthesize_cap_label(src_cap.get("type", ""), c.get("kind"), c)
         d["capabilities"] = caps_out
     if any(c.get("helpWanted") for c in caps):
         d["helpWanted"] = True

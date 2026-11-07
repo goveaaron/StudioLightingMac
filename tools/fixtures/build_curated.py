@@ -145,6 +145,9 @@ def ch_sat(label="Saturation", fine=False):
 
 
 def ch_hsi_base_cct(lo, hi, label="HSI Base CCT", fine=False):
+    # In HSI-only modes this is the only CCT channel and follows the requested white point.
+    # In modes that also have a main CCT channel, `separate_hsi_base_cct` turns it into an
+    # advanced generic channel that stays at "6500 K Default".
     if fine:
         return {"kind": "cct", "label": label, "fine": True}
     return {
@@ -157,6 +160,26 @@ def ch_hsi_base_cct(lo, hi, label="HSI Base CCT", fine=False):
             {"range": [11, 255], "label": f"{lo}–{hi} K", "tag": "cct", "physical": [lo, hi]},
         ],
     }
+
+
+def separate_hsi_base_cct(mode):
+    """A mode with a main CCT channel *and* an HSI base CCT channel (LS 600c Pro "CCT & HSI")
+    must not drive both from the CCT control: the base CCT becomes an advanced generic
+    channel (with its fine byte) that keeps its "6500 K Default" value."""
+    chans = mode.get("channels", [])
+    if not isinstance(chans, list):
+        return
+    main = [c for c in chans if isinstance(c, dict) and c.get("kind") == "cct" and not c.get("fine")
+            and "HSI" not in c.get("label", "")]
+    if not main:
+        return
+    for i, c in enumerate(chans):
+        if isinstance(c, dict) and c.get("kind") == "cct" and "HSI" in c.get("label", ""):
+            # Copies: channel dicts may be shared between modes.
+            chans[i] = dict(c, kind="generic", advanced=True)
+            nxt = chans[i + 1] if i + 1 < len(chans) else None
+            if isinstance(nxt, dict) and nxt.get("kind") == "cct" and nxt.get("fine"):
+                chans[i + 1] = dict(nxt, kind="generic", advanced=True, label=c.get("label", "HSI Base CCT") + " Fine")
 
 
 def ch_xy(fine_pairs=False):
@@ -2703,6 +2726,8 @@ def write_pack(rel_path, fixtures):
         if clean != fx["id"]:
             print(f"  id {fx['id']} -> {clean}")
             fx["id"] = clean
+        for mode in fx.get("modes", []):
+            separate_hsi_base_cct(mode)
     ids = [fx["id"] for fx in fixtures]
     if len(ids) != len(set(ids)):
         raise SystemExit(f"duplicate fixture ids in {rel_path}")

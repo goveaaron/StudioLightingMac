@@ -217,7 +217,9 @@ def git_commit(path):
 # ==============================================================================
 
 def load_ofl_converter(ofl_root):
-    conv_dir = os.path.dirname(os.path.abspath(ofl_root))
+    # Always the converter next to this script (tools/fixtures/convert_ofl.py), never a copy
+    # that happens to sit beside the OFL checkout.
+    conv_dir = os.path.dirname(os.path.abspath(__file__))
     if conv_dir not in sys.path:
         sys.path.insert(0, conv_dir)
     import convert_ofl  # noqa: E402
@@ -757,8 +759,15 @@ def convert_all_qlc(qlc_root, out_root, seen_models):
         # Parse modes
         modes_out = []
         all_kinds = set()
+        seen_mode_names = set()
         for m_elem in root.findall(QLC_NS + "Mode"):
-            mname = (m_elem.get("Name") or "Default").strip()
+            mname = (m_elem.get("Name") or "Default").strip() or "Default"
+            # Patches refer to modes by name, so repeated names get a number.
+            base_mname, n_dup = mname, 2
+            while mname in seen_mode_names:
+                mname = f"{base_mname} ({n_dup})"
+                n_dup += 1
+            seen_mode_names.add(mname)
             m_ch_elems = m_elem.findall(QLC_NS + "Channel")
             if not (1 <= len(m_ch_elems) <= 512):
                 continue
