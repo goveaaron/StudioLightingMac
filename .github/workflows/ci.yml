@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: ['**']
+    # Docs-only pushes don't need the (shared, limited) macOS runners.
+    paths-ignore: ['docs/**', '*.md']
   workflow_dispatch:
     inputs:
       release:
