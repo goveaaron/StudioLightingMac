@@ -4,6 +4,14 @@ import Foundation
 // colour and a perceptual intensity for one pixel. Everything time-varying comes from the
 // per-frame `MoodFrame` (clocks, latency-compensated beat phases, events, palette cross-fade),
 // built by `MusicRenderSession`. Moods never write DMX and never bypass `MusicSafety`.
+//
+// STATUS (cloud handoff, Nov 2026): this kit (MoodKit, MoodPalettes, MoodShaders) compiles but
+// is not wired in yet. Still to write: `MusicRenderSession` (layout → MoodPixel, MoodFrame
+// builder with clocks/rings/palette cross-fade, Auto mood selector, hand-back), `MusicSafety`
+// (per-class slew, floors, red rule, flash guard ≤ 4–6 transitions/s), the `session:` parameter
+// threaded through `EngineCore.renderFrame` → `MusicEngine.apply`, and Linux tests (60 s of
+// every mood finite/in range/under the flash caps). Until then `MusicEngine.apply` renders the
+// older baseline look.
 
 /// One shaded pixel.
 struct MoodSample {
